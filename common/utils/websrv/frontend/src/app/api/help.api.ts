@@ -21,5 +21,5 @@ const hlproute = 'oaisoftmodem/helpfiles/';
 export class HelpApi {
     constructor(private httpClient: HttpClient) { }
 
-    public getHelp$ = (req : HelpRequest) => this.httpClient.get<HelpResp>(environment.backend + hlproute + req.component + "_" + req.module + "_" + req.object + ".html");
+    public getHelp$ = (req : HelpRequest) => this.httpClient.get<HelpResp>(environment.backend + hlproute + req.component + "_" + req.module + "_" + req.object + ".html",{observe: 'response'});
 }

@@ -36,15 +36,7 @@
 #define WEBSRV_MODNAME  "websrv"
 
 #define WEBSRV_PORT               8090
-/* websrv_printf_t is an internal structure storing messages while processing a request */
-/* The meaage is used to fill a response body                                           */
-typedef struct {
-  pthread_mutex_t mutex;          // protect the message betwween the websrv_printf_start and websrv_print_end calls
-  struct _u_response * response;  // the ulfius response structure, used to send the message
-  char *buff;                     // a buffer to store the message, allocated in websrv_printf_start, free in websrv_print_end
-  int  buffsize;                  //
-  char *buffptr;                  // pointer to free portion of buff
-} websrv_printf_t;
+
 
 /* websrv_params_t is an internal structure storing all the current parameters and */
 /* global variables used by the web server                                        */
@@ -56,7 +48,7 @@ typedef struct {
      unsigned int   listenport;           // ip port the telnet server is listening on
      unsigned int   listenaddr;           // ip address the telnet server is listening on
      unsigned int   listenstdin;          // enable command input from stdin
-     char *url;                           // url for the main (initial) web page 
+     char *fpath;                         // directory where the server is looking for files (html...) 
      char *certfile;                      // cert file
      char *keyfile;                       // key file  
      char *rootcafile;                    // root ca file
@@ -122,15 +114,17 @@ typedef struct {
 /*------------------------------------------------------------------------------------------------*/
 /* web server utilities:                                                                          */
 
-extern void websrv_printjson(char * label, json_t *jsonobj);                                    //debug:  dump a json object
-extern void websrv_jbody( struct _u_response * response, json_t *jbody,int httpstatus);         // add a json body in a http response
+extern void websrv_printjson(char * label, json_t *jsonobj,int dbglvl);                                   //debug:  dump a json object
+extern void websrv_jbody( struct _u_response * response, json_t *jbody,int httpstatus,int dbglvl);         // add a json body in a http response
 
 extern void websrv_printf_start(struct _u_response * response, int buffsize );   // start a printf, lock the buffer
 extern void websrv_printf( const char *message,  ...);                           // add characters in the printf locked buffer
-extern void websrv_printf_end(int httpstatus );                                  // add the printf buffer in the body of a http response, unlock the buffer
-extern void websrv_dump_request(char *label, const struct _u_request *request);  // debug: dump a http request
-extern int websrv_string_response(char *astring, struct _u_response * response, int httpstatus) ;  // add a string in a http response
-
+extern void websrv_printf_end(int httpstatus,int dbglvl );                       // add the printf buffer in the body of a http response, unlock the buffer
+extern void websrv_dump_request(char *label, const struct _u_request *request, int dbglvl);        // debug: dump a http request
+extern int websrv_string_response(char *astring, struct _u_response * response, int httpstatus, int dbglvl) ;  // add a string in a http response
+extern void websrv_utils_build_hlpfile(char *fname);                             // build a file to be downloade by the frontend 
+extern char * websrv_read_file(const char * filename);                           // map a file in a string variable
+extern FILE *websrv_getfile(char *filename, struct _u_response * response);      // answer a front-end file upload request
 /* webserver API:                                                                                  */
 extern int websrv_init_websocket(websrv_params_t *websrvparams,char *module);
 extern void websrv_websocket_send_message(char msg_src, char msg_type, char *msg_data, struct _websocket_manager * websocket_manager);
@@ -150,5 +144,6 @@ extern int websrv_scope_manager(uint64_t lcount,websrv_params_t *websrvparams);
 extern void  websrv_scope_senddata(int numd,int dsize, websrv_scopedata_msg_t *msg);                         
 extern websrv_scope_params_t *websrv_scope_getparams(void);
 extern void websrv_scope_stop(void);
+
 /*-----------------------------------------------------------------------------------------------------------*/
 #endif

@@ -60,7 +60,7 @@ void websrv_websocket_onclose_callback (const struct _u_request * request,
                                 struct _websocket_manager * websocket_manager,
                                 void * websocket_onclose_user_data) {
   websrv_params_t *websrvparams = (websrv_params_t *)websocket_onclose_user_data;
-  websrv_dump_request("websocket close ",request);
+  websrv_dump_request("websocket close ",request,websrvparams->dbglvl);
   websrvparams->wm=NULL;
   websrv_scope_stop();
 }
@@ -75,8 +75,9 @@ void websrv_websocket_manager_callback(const struct _u_request * request,
                                struct _websocket_manager * websocket_manager,
                                void * websocket_manager_user_data) {
 
-  websrv_dump_request("websocket manager ",request);
+ 
   websrv_params_t *websrvparams = (websrv_params_t *)websocket_manager_user_data;
+  websrv_dump_request("websocket manager ",request,websrvparams->dbglvl);
   while(websrvparams->wm != NULL) {
 	 LOG_I(UTIL,"[websrv] Waitting a previous websocket instance to close...\n");
 	 usleep(100000); 
@@ -142,8 +143,8 @@ void websrv_websocket_incoming_message_callback (const struct _u_request * reque
 int websrv_callback_websocket (const struct _u_request * request, struct _u_response * response, void * user_data) {
   int ret;
   
-  websrv_dump_request("websocket ",request);
   websrv_params_t *websrvparams = (websrv_params_t *)user_data;
+  websrv_dump_request("websocket ",request, websrvparams->dbglvl);
   if (websrvparams->wm != NULL) {
     websrv_close_ws(websrvparams,"ws url callback");
   }

@@ -47,7 +47,6 @@
  //#define WEBSRV_AUTH
 
  static websrv_params_t websrvparams;
- static websrv_printf_t websrv_printf_buff;
  static telnetsrv_params_t *dummy_telnetsrv_params=NULL;
  paramdef_t websrvoptions[] = {
   /*-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -58,143 +57,18 @@
   {"listenport",                   "<local port>\n",                0,                 uptr:&(websrvparams.listenport),      defuintval:8090,                TYPE_UINT,      0 },
   {"priority",                     "<scheduling policy (0-99)\n",   0,                 iptr:&websrvparams.priority,          defuintval:0,                   TYPE_INT,       0 },
   {"debug",                        "<debug level>\n",               0,                 uptr:&websrvparams.dbglvl,            defuintval:0,                   TYPE_UINT,      0 },
-  {"url",                          "<server url>\n",                0,                 strptr:&websrvparams.url,             defstrval:"websrv/index.html",         TYPE_STRING,    0 }, 
+  {"fpath",                        "<file directory>\n",            0,                 strptr:&websrvparams.fpath,           defstrval:"websrv",             TYPE_STRING,    0 }, 
   {"cert",                         "<cert file>\n",                 0,                 strptr:&websrvparams.certfile,        defstrval:NULL,                 TYPE_STRING,    0 }, 
   {"key",                          "<key file>\n",                  0,                 strptr:&websrvparams.keyfile,         defstrval:NULL,                 TYPE_STRING,    0 },
   {"rootca",                       "<root ca file>\n",              0,                 strptr:&websrvparams.rootcafile,      defstrval:NULL,                 TYPE_STRING,    0 },
 };
-int websrv_add_endpoint( char **http_method, int num_method, const char * url_prefix,const char * url_format,
-                         int (* callback_function[])(const struct _u_request * request, 
-                         struct _u_response * response,
-                         void * user_data),
-                         void * user_data) ;
+
     
 void register_module_endpoints(cmdparser_t *module) ;
                          
-void websrv_printjson(char * label, json_t *jsonobj){
-	if (websrvparams.dbglvl>0) {
-	  char *jstr = json_dumps(jsonobj,0);
-	  LOG_I(UTIL,"[websrv] %s:%s\n", label, (jstr==NULL)?"??\n":jstr);
-      free(jstr);
-  }
-}
+
 void websrv_gettbldata_response(struct _u_response * response,webdatadef_t * wdata) ;
 int websrv_callback_get_softmodemcmd(const struct _u_request * request, struct _u_response * response, void * user_data);
-/*------------------------------------------------------------------------------*/
-/* dump a request                                                               */
-void websrv_dump_request(char *label, const struct _u_request *request)
-{
-  LOG_I(UTIL,"[websrv] %s, request %s, proto %s, verb %s, path %s\n",label, request->http_url, request->http_protocol, request->http_verb, request->http_verb);
-  if (request->map_post_body != NULL)
-    for (int i=0; i<u_map_count(request->map_post_body) ; i++)
-      LOG_I(UTIL,"[websrv] POST parameter %i %s : %s\n",i,u_map_enum_keys(request->map_post_body)[i], u_map_enum_values(request->map_post_body)[i]	);
-  if (request->map_cookie != NULL)
-    for (int i=0; i<u_map_count(request->map_cookie) ; i++)
-      LOG_I(UTIL,"[websrv] cookie variable %i %s : %s\n",i,u_map_enum_keys(request->map_cookie)[i], u_map_enum_values(request->map_cookie)[i]	);
-  if (request->map_header != NULL)
-    for (int i=0; i<u_map_count(request->map_header) ; i++)
-      LOG_I(UTIL,"[websrv] header variable %i %s : %s\n",i,u_map_enum_keys(request->map_header)[i], u_map_enum_values(request->map_header)[i]	);
-  if (request->map_url != NULL)
-    for (int i=0; i<u_map_count(request->map_url) ; i++)
-       LOG_I(UTIL,"[websrv] url variable %i %s : %s\n",i,u_map_enum_keys(request->map_url)[i], u_map_enum_values(request->map_url)[i]	);
-}
-/*-----------------------------------*/
-/* build a json body in a response */
-void websrv_jbody( struct _u_response * response, json_t *jbody,int httpstatus) {
-  websrv_printjson( (char *)__FUNCTION__ , jbody);
-  int us=ulfius_add_header_to_response(response,"content-type" ,"application/json");
-  if (us != U_OK){
-	  ulfius_set_string_body_response(response, 500, "Internal server error (ulfius_add_header_to_response)");
-	  LOG_E(UTIL,"[websrv] cannot set response header type ulfius error %d \n",us);
-  }   
-  us=ulfius_set_json_body_response(response, httpstatus, jbody);
-  if (us != U_OK){
-	  ulfius_set_string_body_response(response, 500, "Internal server error (ulfius_set_json_body_response)");
-	  LOG_E(UTIL,"[websrv] cannot set body response ulfius error %d \n",us);
-  }
-  return;
-}
-
-/*----------------------------------------------------------------*/
-/* format a json string array in a response body                  */
-int websrv_string_response(char *astring, struct _u_response * response, int httpstatus) {
-  json_t *jstr = json_array(); 
-  char *tokctx;
-  char *aline=strtok_r(astring,"\n",&tokctx);
-  while(aline != NULL) {
-    json_t *jline=json_string(aline);
-    json_array_append_new(jstr,jline);
-    aline=strtok_r(NULL,"\n",&tokctx);
-  }
-  json_t *jbody = json_pack("{s:o}","display",jstr);
-  websrv_jbody(response,jbody,httpstatus);
-  return 0; 
-}
-
-/* */
-void websrv_printf_start(struct _u_response * response, int buffsize ) {
-  pthread_mutex_lock(&(websrv_printf_buff.mutex));	
-  websrv_printf_buff.buff = malloc(buffsize);
-  websrv_printf_buff.buffptr = websrv_printf_buff.buff;
-  websrv_printf_buff.buffsize = buffsize;
-  websrv_printf_buff.response = response;
-}
-
-void websrv_printf_atpos( int pos, const char *message,  ...) {
-  va_list va_args;
-  va_start(va_args, message);
-  
-  websrv_printf_buff.buffptr = websrv_printf_buff.buff + pos + vsnprintf( websrv_printf_buff.buff + pos, websrv_printf_buff.buffsize - pos -1,message, va_args );
-
-  va_end(va_args);
-  return ;
-}
-
-void websrv_printf( const char *message,  ...) {
-  va_list va_args;
-  va_start(va_args, message);
-  websrv_printf_buff.buffptr +=  vsnprintf( websrv_printf_buff.buffptr,
-                                            websrv_printf_buff.buffsize - (websrv_printf_buff.buffptr - websrv_printf_buff.buff) - 1,message, va_args );	
-  
-  va_end(va_args); 
-  return ;
-}
-
-void websrv_printf_end(int httpstatus ) {
-  if (httpstatus >= 200 && httpstatus < 300) {
-    LOG_I(UTIL,"[websrv] %s\n",websrv_printf_buff.buff);
-    websrv_string_response(websrv_printf_buff.buff, websrv_printf_buff.response, httpstatus) ;   
-  } else if ( httpstatus < 1000) {
-    LOG_W(UTIL,"[websrv] %s\n",websrv_printf_buff.buff);
-    ulfius_set_binary_body_response(websrv_printf_buff.response,httpstatus , websrv_printf_buff.buff,websrv_printf_buff.buffptr - websrv_printf_buff.buff);
-  }
-  
-  free(websrv_printf_buff.buff);
-  websrv_printf_buff.buff=NULL;
-  pthread_mutex_unlock(&(websrv_printf_buff.mutex));
-
-}
-
-/* buid a response via a webdatadef_t structure containing one string column               */
-void websrv_printf_tbl_end(int httpstatus ) {
-  webdatadef_t pdata;
-  char *tokctx;
-  
-  pdata.numcols=1;
-  pdata.numlines=0;
-  pdata.columns[0].coltype = TELNET_VARTYPE_STRING | TELNET_CHECKVAL_RDONLY;
-  strcpy(pdata.columns[0].coltitle," ");
-  for ( char *alineptr=strtok_r(websrv_printf_buff.buff,"\n",&tokctx); alineptr != NULL ; alineptr=strtok_r(NULL,"\n",&tokctx) ) {
-	  pdata.lines[pdata.numlines].val[0]=alineptr;
-	  pdata.numlines++;  
-  }
-  websrv_gettbldata_response(websrv_printf_buff.response,&pdata);
-  free(websrv_printf_buff.buff);
-  websrv_printf_buff.buff=NULL;
-  pthread_mutex_unlock(&(websrv_printf_buff.mutex));
-
-}
-
 
 /*--------------------------------------------------------------------------------------------------*/
 /* format a json response from a result table returned from a call to a telnet server command       */
@@ -234,91 +108,13 @@ void websrv_gettbldata_response(struct _u_response * response,webdatadef_t * wda
       json_array_append_new(jdata,jline);  
     }
     json_t *jbody=json_pack("{s:[],s:{s:o,s:o}}","display","table","columns",jcols,"rows",jdata);
-    websrv_jbody(response,jbody,200);
+    websrv_jbody(response,jbody,200, websrvparams.dbglvl);
     telnetsrv_freetbldata(wdata);
-}
-
-/*----------------------------------------------------------------------------------------------------------*/
-/* callbacks and utility functions to stream a file */
-char * websrv_read_file(const char * filename) {
-  char * buffer = NULL;
-  long length;
-  FILE * f = fopen (filename, "rb");
-  if (f != NULL) {
-    fseek (f, 0, SEEK_END);
-    length = ftell (f);
-    fseek (f, 0, SEEK_SET);
-    buffer = malloc (length + 1);
-    if (buffer != NULL) {
-      int rlen = fread (buffer, 1, length, f);
-      if (rlen !=length) {
-        free(buffer);
-        LOG_E(UTIL,"[websrv] couldn't read %s_\n",filename);
-        return NULL;
-      }
-      buffer[length] = '\0';
-    }
-    fclose (f);
-  }
-  return buffer;
-}
-/* callbacks to send static streams */
-static ssize_t callback_stream(void * cls, uint64_t pos, char * buf, size_t max) {
-  if (cls != NULL) {
-    return fread (buf, sizeof(char), max, (FILE *)cls);
-  } else {
-    return U_STREAM_END;
-  }
-}
-
-static void callback_stream_free(void * cls) {
-  if (cls != NULL) {
-    fclose((FILE *)cls);
-  }
-}
-
-FILE *websrv_getfile(char *filename, struct _u_response * response) {
-    FILE *f = fopen (filename, "rb");
-  int length;
-  
-  if (f) {
-    fseek (f, 0, SEEK_END);
-    length = ftell (f);
-    fseek (f, 0, SEEK_SET);
-    LOG_I(UTIL,"[websrv] sending %d bytes from %s\n", length, filename);
-  } else {
-    LOG_E(UTIL,"[websrv] couldn't open %s\n",filename);
-    return NULL;
-  }
-
-  char *content_type="text/html";
-  size_t nl = strlen(filename);
-  if ( nl >= 3 && !strcmp(filename + nl - 3, "css"))
-     content_type="text/css";
-  if ( nl >= 2 && !strcmp(filename + nl - 2, "js"))
-     content_type="text/javascript";
-     
-  int ust=ulfius_add_header_to_response(response,"content-type" ,content_type);
-  if (ust != U_OK){
-	  ulfius_set_string_body_response(response, 501, "Internal server error (ulfius_add_header_to_response)");
-	  LOG_E(UTIL,"[websrv] cannot set response header type ulfius error %d \n",ust);
-      fclose(f);
-      return NULL;
-  }
-  
-  ust=ulfius_set_stream_response(response, 200, callback_stream, callback_stream_free, length, 1024, f);
-  if(ust != U_OK) {
-    LOG_E(UTIL,"[websrv] ulfius_set_stream_response error %d\n",ust);
-    fclose(f);
-    return NULL;
-  }
-  return f;  
-    
 }
 
 int websrv_callback_auth(const struct _u_request *request, struct _u_response *response, void *user_data) {
   LOG_I(UTIL,"[websrv] authenticating %s %s\n", request->http_verb,request->http_url);
-  websrv_dump_request("authentication ",request);		
+  websrv_dump_request("authentication ",request, websrvparams.dbglvl);		
 
 #ifdef WEBSRV_AUTH
   char * dn = NULL, * issuer_dn = NULL;
@@ -353,19 +149,19 @@ int websrv_callback_auth(const struct _u_request *request, struct _u_response *r
 /* callback to answer a request to download a file from  the softmodem (example: a config file  */
 int websrv_callback_get_softmodemfile(const struct _u_request *request, struct _u_response *response, void *user_data) {
   LOG_I(UTIL,"[websrv] %s received: %s %s\n",__FUNCTION__,request->http_verb,request->http_url);
-  websrv_dump_request("get softmodem file ",request);	
+  websrv_dump_request("get softmodem file ",request,websrvparams.dbglvl);	
   if (request->map_post_body == NULL) {
 	LOG_W(UTIL,"[websrv] No post parameters in: %s %s\n",request->http_verb,request->http_url);
-	websrv_string_response("Invalid file request, no post parameters", response, 404);
+	websrv_string_response("Invalid file request, no post parameters", response, 404,websrvparams.dbglvl);
   }
   char *fname=(char *)u_map_get(request->map_post_body,"fname");
   if (fname == NULL) {
 	LOG_W(UTIL,"[websrv] fname post parameters not found: %s %s\n",request->http_verb,request->http_url); 
-	websrv_string_response("Invalid file request, no file name in post parameters", response, 404);
+	websrv_string_response("Invalid file request, no file name in post parameters", response, 404, websrvparams.dbglvl);
   }
   if ( websrv_getfile(fname,response) == NULL) {
 	LOG_W(UTIL,"[websrv] file %s not found\n",fname); 
-	websrv_string_response("file not found", response, 501);
+	websrv_string_response("file not found", response, 501, websrvparams.dbglvl);
   }
    
 return U_CALLBACK_COMPLETE;
@@ -381,7 +177,7 @@ int websrv_callback_set_moduleparams(const struct _u_request *request, struct _u
 	   websrv_printf("cannot find json body in %s %s\n",request->http_url, jserr.text );
        httpstatus=400;	 
 	 } else {
-	   websrv_printjson( (char *)__FUNCTION__,jsbody);
+	   websrv_printjson( (char *)__FUNCTION__,jsbody,websrvparams.dbglvl);
        if (user_data == NULL) {
          httpstatus=500;
          websrv_printf("%s: NULL user data",request->http_url);
@@ -427,7 +223,7 @@ int websrv_callback_set_moduleparams(const struct _u_request *request, struct _u
 			     cmd->webfunc_getdata(cmdName,websrvparams.dbglvl,&datatbl,websrv_printf);
                  if (cmd->cmdflags & TELNETSRV_CMDFLAG_WEBSRV_SETRETURNTBL) {
                     httpstatus=1000;
-                    websrv_printf_end(httpstatus); 
+                    websrv_printf_end(httpstatus,websrvparams.dbglvl); 
                     websrv_gettbldata_response(response,&datatbl);
                     return U_CALLBACK_COMPLETE;  
                  }
@@ -437,35 +233,36 @@ int websrv_callback_set_moduleparams(const struct _u_request *request, struct _u
 		 } // json_unpack_ex(jsbody OK
        }//user_data
      } //sbody
-  websrv_printf_end(httpstatus);
+  websrv_printf_end(httpstatus,websrvparams.dbglvl);
   return U_CALLBACK_COMPLETE;      	
 }
 /*------------------------------------------------------------------------------------------------------------------------*/
-/* callback processing main ((initial) url (<address>/<websrvparams.url> */
-int websrv_callback_get_mainurl(const struct _u_request * request, struct _u_response * response, void * user_data) {
-  LOG_I(UTIL,"[websrv] Requested file is: %s\n",request->http_url);  
-
-  FILE *f = websrv_getfile(websrvparams.url,response) ;
-  if (f == NULL)
-    return U_CALLBACK_ERROR;
-  return U_CALLBACK_CONTINUE;
-}
 /* callback to format a help response */
 int websrv_callback_get_softmodemhelp(const struct _u_request * request, struct _u_response * response, void * user_data) {
   LOG_I(UTIL,"[websrv] Requested file is: %s %s\n",request->http_verb,request->http_url);
-  websrv_dump_request("help ", request);
+  websrv_dump_request("help ", request, websrvparams.dbglvl);
   char *help_string=NULL;
-  char *hlpfile=strstr(request->http_url,"helpfile");
+  int httpstatus=204;  //no content
+  char *hlpfile=strstr(request->http_url,"helpfiles");
   if (hlpfile!=NULL) {
-    help_string = websrv_read_file(strstr(request->http_url,"helpfile"));
+    char *hlppath=malloc(strlen(hlpfile)+strlen(websrvparams.fpath)+1);
+    sprintf(hlppath,"%s/%s",websrvparams.fpath,hlpfile);
+    int st=access(hlppath,R_OK);
+    if(st<0) {
+	  websrv_utils_build_hlpfile(hlppath) ;
+	}
+    help_string = websrv_read_file(hlppath);
     if (help_string == NULL) {
 	  help_string = strdup("Help file not found");
+	} else {
+	  httpstatus=201; //created	
 	}
+	free(hlppath);
   } else {
 	help_string = strdup("Help request format error");
   } 
   json_t *jhelp=json_pack("{s:s}","text",help_string);
-  websrv_jbody( response, jhelp,200);
+  websrv_jbody( response, jhelp,httpstatus, websrvparams.dbglvl);
   free(help_string);	
   return U_CALLBACK_CONTINUE;
 }
@@ -473,18 +270,16 @@ int websrv_callback_get_softmodemhelp(const struct _u_request * request, struct 
 /* default callback tries to find a file in the web server repo (path exctracted from <websrvparams.url>) and if found streams it */
  int websrv_callback_default (const struct _u_request * request, struct _u_response * response, void * user_data) {
   LOG_I(UTIL,"[websrv] Requested file is: %s %s\n",request->http_verb,request->http_url);
-  websrv_dump_request("default ", request);
-  char *tmpurl = strdup(websrvparams.url);
-  char *srvdir = dirname(tmpurl);
-  if (srvdir==NULL) {
-      LOG_E(UTIL,"[websrv] Cannot extract dir name from %s requested file is %s\n",websrvparams.url,request->http_url); 
-      return U_CALLBACK_ERROR;
+  websrv_dump_request("default ", request, websrvparams.dbglvl);
+  
+  char *fpath = malloc( strlen(request->http_url)+strlen(websrvparams.fpath)+2);
+  if((strcmp(request->http_url+1,websrvparams.fpath) == 0) || (strcmp(request->http_url,"/") == 0)) {
+	sprintf(fpath,"%s/index.html",websrvparams.fpath); 
+  } else {
+    sprintf(fpath,"%s/%s",websrvparams.fpath, request->http_url);
   }
-  char *fpath = malloc( strlen(request->http_url)+strlen(srvdir)+2);
-  sprintf(fpath,"%s/%s",srvdir, request->http_url);
   FILE *f = websrv_getfile(fpath,response) ;
   free(fpath);
-  free(tmpurl);
   if (f == NULL)
     return U_CALLBACK_ERROR;
   return U_CALLBACK_CONTINUE;
@@ -544,7 +339,7 @@ int websrv_callback_set_softmodemvar(const struct _u_request * request, struct _
 	   websrv_printf("cannot find json body in %s %s\n",request->http_url, jserr.text );
        httpstatus=400;	 
 	 } else {
-	   websrv_printjson("callback_set_softmodemvar: ",jsbody);
+	   websrv_printjson("callback_set_softmodemvar: ",jsbody,websrvparams.dbglvl);
        if (user_data == NULL) {
          httpstatus=500;
          websrv_printf("%s: NULL user data",request->http_url);
@@ -608,7 +403,7 @@ int websrv_callback_set_softmodemvar(const struct _u_request * request, struct _
          }//for
        }//user_data
      } //sbody
-     websrv_printf_end(httpstatus);
+     websrv_printf_end(httpstatus,websrvparams.dbglvl);
 	 return U_CALLBACK_COMPLETE;   
 }
 /* callback processing module url (<address>/oaisoftmodem/module/commands), post method */
@@ -628,7 +423,7 @@ int websrv_processwebfunc(struct _u_response * response, cmdparser_t * modulestr
 		json_unpack_ex(jparams,&jerror,0,"{s:s,s:s,s:s,s,b}","name",&pname,"value",&pvalue,"type",&ptype,"modifiable",&b);
 		if (pvalue==NULL || pname==NULL || ptype == NULL) {
 		  LOG_I(UTIL, "[websrv], couldn't unpack jparams, module %s, command %s: %s\n",modulestruct->module,cmd->cmdname,jerror.text);
-		  websrv_printjson( (char *)__FUNCTION__ ,jparams);
+		  websrv_printjson( (char *)__FUNCTION__ ,jparams,websrvparams.dbglvl);
 		  http_status=500;
 	    } else {
 		  snprintf(wdata.columns[0].coltitle,sizeof(wdata.columns[0].coltitle)-1,"%s",pname);
@@ -647,10 +442,7 @@ int websrv_processwebfunc(struct _u_response * response, cmdparser_t * modulestr
       telnet_pushcmd(cmd, (sptr==NULL)?cmd->cmdname:sptr, websrv_printf);
     else
       cmd->cmdfunc((sptr==NULL)?cmd->cmdname:sptr,websrvparams.dbglvl,websrv_printf);
-    if (cmd->cmdflags & TELNETSRV_CMDFLAG_PRINTWEBTBLDATA)
-      websrv_printf_tbl_end(http_status);
-    else
-      websrv_printf_end(http_status);
+    websrv_printf_end(http_status,websrvparams.dbglvl);
   }
   return http_status;
 }
@@ -670,7 +462,7 @@ int websrv_callback_exec_softmodemcmd(const struct _u_request * request, struct 
 	   msg="Unproperly formatted request body";
        httpstatus=400;	 
 	 } else {
-	   websrv_printjson("callback_exec_softmodemcmd: ",jsbody);
+	   websrv_printjson("callback_exec_softmodemcmd: ",jsbody,websrvparams.dbglvl);
        json_t *J=json_object_get(jsbody, "name");
        const char *vname = json_string_value(J);
        if (vname == NULL ) {
@@ -734,7 +526,7 @@ int websrv_callback_get_softmodemvar(const struct _u_request * request, struct _
        if (oneaction==NULL) {
 	     LOG_E(UTIL,"[websrv] cannot encode oneaction %s/%s\n",modulestruct->module,modulestruct->var[j].varname);
        } else {
-	     websrv_printjson("oneaction",oneaction);
+	     websrv_printjson("oneaction",oneaction,websrvparams.dbglvl);
        }   
 	   free(strval);
        json_array_append(modulevars , oneaction);
@@ -742,7 +534,7 @@ int websrv_callback_get_softmodemvar(const struct _u_request * request, struct _
      if (json_array_size(modulevars) == 0) {
 	   LOG_I(UTIL,"[websrv] no defined variables for %s\n",modulestruct->module);
      } else {
-	   websrv_printjson("modulevars",modulevars);
+	   websrv_printjson("modulevars",modulevars,websrvparams.dbglvl);
      }
 
      int us=ulfius_add_header_to_response(response,"content-type" ,"application/json");
@@ -805,7 +597,7 @@ int websrv_callback_get_softmodemcmd(const struct _u_request * request, struct _
       if (modulesubcom==NULL) {
 	      LOG_E(UTIL,"[websrv] cannot encode modulesubcom response for %s\n",modulestruct->module);
       } else {
-	      websrv_printjson("modulesubcom",modulesubcom);
+	      websrv_printjson("modulesubcom",modulesubcom,websrvparams.dbglvl);
       }             
       int us=ulfius_add_header_to_response(response,"content-type" ,"application/json");
       if (us != U_OK){
@@ -841,7 +633,7 @@ int websrv_callback_get_softmodemmodules(const struct _u_request * request, stru
 	  ulfius_set_string_body_response(response, 501, "Internal server error (ulfius_set_json_body_response)");
 	  LOG_E(UTIL,"[websrv] cannot set modules body response ulfius error %d \n",us);
   } else {
-	  websrv_printjson("cmdnames",cmdnames);
+	  websrv_printjson("cmdnames",cmdnames,websrvparams.dbglvl);
   }  
 //  ulfius_set_string_body_response(response, 200, cfgfile);
   return U_CALLBACK_COMPLETE;
@@ -861,7 +653,7 @@ void websrv_add_modeminfo(json_t *modemvars, char *infoname, char *infoval, char
   if (info==NULL) {
 	  LOG_E(UTIL,"[websrv] cannot encode modem info %s response\n",infoname);
   } else {
-	  websrv_printjson("status body1",info);
+	  websrv_printjson("status body1",info,websrvparams.dbglvl);
   }  
   json_array_append_new(modemvars , info);
 } 
@@ -981,18 +773,16 @@ void* websrv_autoinit() {
   
   // Maximum body size sent by the client is 1 Kb
   websrvparams.instance.max_post_body_size = 1024;
+
   
-  // Endpoint list declaration
-  //1: load the frontend code: files contained in the websrvparams.url directory
-  ulfius_add_endpoint_by_val(&(websrvparams.instance), "GET", websrvparams.url, NULL, 1, &websrv_callback_get_mainurl, NULL);
-  //2: build the first page, when receiving the "oaisoftmodem" url 
+  //1: build the first page, when receiving the "oaisoftmodem" url 
 //  ulfius_add_endpoint_by_val(&(websrvparams.instance), "GET", "oaisoftmodem", "variables", 0, &websrv_callback_get_softmodemstatus, NULL);
   ulfius_add_endpoint_by_val(&(websrvparams.instance), "GET", "oaisoftmodem", "commands", 1, &websrv_callback_get_softmodemmodules, NULL);
 
-  //3 default_endpoint declaration, it tries to open the file with the url name as specified in the request.It looks for the file 
+  //2 default_endpoint declaration, it tries to open the file with the url name as specified in the request.It looks for the file 
   ulfius_set_default_endpoint(&(websrvparams.instance), &websrv_callback_default, NULL);
 
-  //4 endpoints corresponding to loaded telnet modules
+  //3 endpoints corresponding to loaded telnet modules
   int (* callback_functions_var[3])(const struct _u_request * request, 
                                                struct _u_response * response,
                                                void * user_data) ={websrv_callback_get_softmodemstatus,websrv_callback_okset_softmodem_cmdvar,websrv_callback_set_softmodemvar};
@@ -1004,17 +794,17 @@ void* websrv_autoinit() {
 	  register_module_endpoints( &(telnetparams->CmdParsers[i]) );
   }
   
-  /*5 callbacks to take care of modules not yet initialized, so not visible in telnet server data when this autoinit runs: */
+  /*4 callbacks to take care of modules not yet initialized, so not visible in telnet server data when this autoinit runs: */
   ulfius_add_endpoint_by_val(&(websrvparams.instance), "GET", "oaisoftmodem", "@module/commands", 10, websrv_callback_newmodule, telnetparams);
   ulfius_add_endpoint_by_val(&(websrvparams.instance), "GET", "oaisoftmodem", "@module/variables", 10, websrv_callback_newmodule, telnetparams);
-  //6 callback to handle file request
+  //5 callback to handle file request
   ulfius_add_endpoint_by_val(&(websrvparams.instance), "POST", "oaisoftmodem", "file", 1, &websrv_callback_get_softmodemfile, NULL);
-  //7 callback for help request
+  //6 callback for help request
   ulfius_add_endpoint_by_val(&(websrvparams.instance), "GET", "oaisoftmodem", "helpfiles/@hlpfile", 2, &websrv_callback_get_softmodemhelp, NULL);
-   // init softscope interface support */
+  // init softscope interface support */
    websrv_init_scope(&websrvparams) ;
    
-   // init websocket */
+  //8 init websocket */
    websrv_init_websocket(&websrvparams,"softscope") ;
 
     

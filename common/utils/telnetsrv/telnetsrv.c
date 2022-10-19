@@ -160,7 +160,7 @@ void set_sched(pthread_t tid, int pid, int priority) {
     sprintf(strpolicy,"%s","batch");
     niceval=priority+NICE_MIN-(NICE_MAX-NICE_MIN+1);
     schedp.sched_priority=0;
-  } else if (priority >  (2*(NICE_MAX-NICE_MIN)+1)){// fifo  mapped to oai priority 80
+  } else if (priority >  (2*(NICE_MAX-NICE_MIN)+1)){// idle  mapped to oai priority >79
     policy=SCHED_IDLE;
     sprintf(strpolicy,"%s","idle");
     schedp.sched_priority=0;

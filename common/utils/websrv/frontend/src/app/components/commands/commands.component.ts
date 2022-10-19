@@ -151,7 +151,7 @@ export class CommandsComponent {
 // possibly get help..
        for (let i = 0; i < this.columns.length; i = i + 1) {
             this.helpApi.getHelp$({component:"commands", module:this.selectedModule!.name, object:this.columns[i].name}).subscribe( 
-              helpstr =>{ this.hlp_cc[i]=helpstr.text;},
+              response =>{ this.hlp_cc[i]=response.body!.text;},
               err     =>{ this.hlp_cc[i]="no help found";},
 			  );
           }

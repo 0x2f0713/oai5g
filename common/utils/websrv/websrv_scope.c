@@ -156,7 +156,8 @@ char *websrv_scope_initdata(void) {
   
  /*  callback to process control commands received from frontend */
 int websrv_scope_callback_set_params (const struct _u_request * request, struct _u_response * response, void * user_data) {
-     websrv_dump_request("scope set params ", request);
+	 websrv_params_t *websrvparams = (websrv_params_t *)user_data;
+     websrv_dump_request("scope set params ", request,websrvparams->dbglvl);
 	 json_error_t jserr;
 	 json_t* jsbody = ulfius_get_json_body_request (request, &jserr);
      int httpstatus=404;
@@ -167,7 +168,7 @@ int websrv_scope_callback_set_params (const struct _u_request * request, struct 
        httpstatus=400;	 
 	 } else {
 	   errmsg[0]=0;
-	   websrv_printjson("websrv_scope_callback_set_params: ",jsbody);
+	   websrv_printjson("websrv_scope_callback_set_params: ",jsbody,websrvparams->dbglvl);
          json_t *J=json_object_get(jsbody, "name");
          const char *vname=json_string_value(J);
          J=json_object_get(jsbody, "value"); 
@@ -254,13 +255,15 @@ int websrv_scope_callback_set_params (const struct _u_request * request, struct 
   if (httpstatus == 200) {
     ulfius_set_empty_body_response(response, httpstatus);
   } else {
-	 websrv_string_response(errmsg, response, httpstatus); 
+	 websrv_params_t *websrvparams = (websrv_params_t *)user_data;
+	 websrv_string_response(errmsg, response, httpstatus,websrvparams->dbglvl); 
   }
   return U_CALLBACK_COMPLETE;
 }
  
 int websrv_scope_callback_get_desc (const struct _u_request * request, struct _u_response * response, void * user_data) {
-  websrv_dump_request("scope get desc ", request);
+  websrv_params_t *websrvparams = (websrv_params_t *)user_data;
+  websrv_dump_request("scope get desc ", request,websrvparams->dbglvl);
   json_t *jgraph = json_array();
   char gtype[20];
   char stitle[64];
@@ -304,7 +307,7 @@ int websrv_scope_callback_get_desc (const struct _u_request * request, struct _u
         json_array_append_new(jgraph,agraph);
     }
   json_t *jbody = json_pack("{s:s,s:o}","title",stitle,"graphs",jgraph);
-  websrv_jbody(response,jbody,200);
+  websrv_jbody(response,jbody,200,websrvparams->dbglvl);
   return U_CALLBACK_COMPLETE;
 }
  
