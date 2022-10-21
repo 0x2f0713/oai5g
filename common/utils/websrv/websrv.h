@@ -122,9 +122,10 @@ extern void websrv_printf( const char *message,  ...);                          
 extern void websrv_printf_end(int httpstatus,int dbglvl );                       // add the printf buffer in the body of a http response, unlock the buffer
 extern void websrv_dump_request(char *label, const struct _u_request *request, int dbglvl);        // debug: dump a http request
 extern int websrv_string_response(char *astring, struct _u_response * response, int httpstatus, int dbglvl) ;  // add a string in a http response
-extern void websrv_utils_build_hlpfile(char *fname);                             // build a file to be downloade by the frontend 
+extern void websrv_utils_build_hlpfiles(char *path);                             // build files to be downloade by the frontend which cannot be delivered at installation time
 extern char * websrv_read_file(const char * filename);                           // map a file in a string variable
 extern FILE *websrv_getfile(char *filename, struct _u_response * response);      // answer a front-end file upload request
+extern int websrv_utils_testhlp(char *dir,char *module,char *cmdtitle,char *coltitle);     // test if a help file exists
 /* webserver API:                                                                                  */
 extern int websrv_init_websocket(websrv_params_t *websrvparams,char *module);
 extern void websrv_websocket_send_message(char msg_src, char msg_type, char *msg_data, struct _websocket_manager * websocket_manager);

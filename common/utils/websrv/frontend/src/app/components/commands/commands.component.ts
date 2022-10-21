@@ -148,13 +148,20 @@ export class CommandsComponent {
         this.columns = resp.table.columns
         this.displayedColumns = this.columns.map(col => col.name)
         this.displayedColumns.push('button')
-// possibly get help..
+// possibly load help..
        for (let i = 0; i < this.columns.length; i = i + 1) {
-            this.helpApi.getHelp$({component:"commands", module:this.selectedModule!.name, object:this.columns[i].name}).subscribe( 
-              response =>{ this.hlp_cc[i]=response.body!.text;},
-              err     =>{ this.hlp_cc[i]="no help found";},
-			  );
-          }
+		   if (this.columns[i].help) {
+              this.helpApi.getHelp$({module:this.selectedModule!.name, command:control!.api().name.replace(" ","_"),object:this.columns[i].name.replace(" ","_")}).subscribe( 
+                response =>{ 
+				  if(response.status == 201)
+				    this.hlp_cc[i]=response.body!.text;
+				  },
+                err     =>{ this.hlp_cc[i]="";},
+			    );
+		    } else {
+			  this.hlp_cc[i]="";
+			}
+        }
         for (let rawIndex = 0; rawIndex < resp.table.rows.length; rawIndex++) {
 
           let params: IParam[] = []

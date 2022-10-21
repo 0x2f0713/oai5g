@@ -4,6 +4,7 @@ import { BaseChartDirective} from 'ng2-charts';
 import { Subscription } from 'rxjs';
 import { IGraphDesc, IScopeDesc, IScopeGraphType, ISigDesc, ScopeApi } from 'src/app/api/scope.api';
 import { arraybuf_data_offset, Message, WebSocketService, webSockSrc } from "src/app/services/websocket.service";
+import {HelpApi} from 'src/app/api/help.api';
 
 export interface RxScopeMessage {
   msgtype: number;
@@ -273,6 +274,8 @@ export class ScopeComponent implements OnInit, OnDestroy {
       //     parsing: false,
     }
   ];
+//  help text from backend
+  help_ack:string="";
 
   public TRespOptions: ChartConfiguration<'line'>['options'] = {
     responsive: true, 
@@ -327,7 +330,8 @@ export class ScopeComponent implements OnInit, OnDestroy {
 
   constructor(
     private scopeApi: ScopeApi,
-    private wsService: WebSocketService
+    private wsService: WebSocketService,
+    public helpApi    : HelpApi
   ) {
     console.log("Scope constructor ");
   }
@@ -337,7 +341,11 @@ export class ScopeComponent implements OnInit, OnDestroy {
     this.scopeApi.getScopeInfos$().subscribe(resp => {
       this.configScope(resp);
     });
-  }
+    
+    this.helpApi.getHelpText("scope","control","dataack").subscribe( 
+      resp => { this.help_ack=resp; },
+	  err =>   { this.help_ack=""; } );
+    }
 
   ngOnDestroy() {
     console.log("Scope ngOnDestroy ");

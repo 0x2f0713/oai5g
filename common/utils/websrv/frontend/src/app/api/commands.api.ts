@@ -42,6 +42,7 @@ export enum IArgType {
 
 export enum ICommandOptions {
     update = "update",         // result can be updated, triggers update button on result page when set
+    helponcmd = "helponcmd"    // help tooltip available on command buttons
 }
 
 export interface IVariable {
@@ -81,6 +82,7 @@ export interface IColumn { //should use IVariable ?
     name: string;
     type: IArgType;
     modifiable: boolean; //set command ?
+    help:       boolean; // is help available
 }
 export interface IRow {
     params: IParam[],

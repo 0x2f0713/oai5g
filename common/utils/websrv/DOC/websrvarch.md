@@ -16,7 +16,6 @@ web server source files are located in [common/utils/websrv](https://gitlab.eure
 
 1. back-end files are directly located in the `websrv` repository
 1.  The [frontend/src](https://gitlab.eurecom.fr/oai/openairinterface5g/tree/develop/common/utils/websrv/src/frontend) sub-directory contains the angular front-end source tree. 
-
-
+1.  [common/utils/websrv/helpfiles](https://gitlab.eurecom.fr/oai/openairinterface5g/tree/develop/common/utils/websrv/helpfiles) contains files delivered to the front-end to respond to help requests. 
 
 [oai web server interface home](websrv.md)

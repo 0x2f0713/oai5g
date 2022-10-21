@@ -79,8 +79,8 @@ The web server back-end is using the [oai configuration module](Config/Rtusage).
 |:---:|:---:|:---:|:----|
 | `listenaddr` | `ipV4 address, ascii format` | "0.0.0.0" | local address the back-end  is listening on |
 | `listenport` | `integer` | 8090 | port number the server is listening on |
-| debug | `integer` | 0 | triggers specific debug messages, only displayed if UTIL component logging is enabled (at least `info` level) |
-| url | character string | websrv/index.html | url used by the backend . The default value matches the front-end installation when running  the softmodem from the executables repository. |
+| debug | `integer` | 0 | When not 0, http  requests headers and json objects dump are added to back-end traces |
+| fpath | character string | websrv | The path to on-disk http server resources . The default value matches the front-end installation when running  the softmodem from the executables repository. |
 | cert, key, rootca | `character string` | null | certificates and key used to trigger https protocol (not tested) |
 |                   |                              |                   |                                                              |
 
@@ -105,5 +105,7 @@ The interface should be intuitive enough, keeping in mind the following restrict
 - The command tab is not available if the telnet server is not enabled
 - The softscope tab is not available if the xforms scope is started `(-d` option)
 - Only one connection is supported to a back-end, especially for the scope interface
+
+Some front-end  objects provide a tooltip to help interface usage.
 
 [oai web serverinterface  home](websrv.md)

@@ -67,12 +67,12 @@
 void register_module_endpoints(cmdparser_t *module) ;
                          
 
-void websrv_gettbldata_response(struct _u_response * response,webdatadef_t * wdata) ;
+void websrv_gettbldata_response(struct _u_response * response,webdatadef_t * wdata,char *module,char *cmdtitle) ;
 int websrv_callback_get_softmodemcmd(const struct _u_request * request, struct _u_response * response, void * user_data);
 
 /*--------------------------------------------------------------------------------------------------*/
 /* format a json response from a result table returned from a call to a telnet server command       */
-void websrv_gettbldata_response(struct _u_response * response,webdatadef_t * wdata) {
+void websrv_gettbldata_response(struct _u_response * response,webdatadef_t * wdata,char *module,char *cmdtitle) {
 	json_t *jcols = json_array();
     json_t *jdata = json_array();
     char *coltype;
@@ -87,8 +87,9 @@ void websrv_gettbldata_response(struct _u_response * response,webdatadef_t * wda
         coltype="string";
       else
         coltype="number";
-      json_t *acol=json_pack("{s:s,s:s,s:b}","name",wdata->columns[i].coltitle,"type",coltype,
-                            "modifiable",( wdata->columns[i].coltype & TELNET_CHECKVAL_RDONLY)?0:1  );
+      json_t *acol=json_pack("{s:s,s:s,s:b,s:b}","name",wdata->columns[i].coltitle,"type",coltype,
+                            "modifiable",( wdata->columns[i].coltype & TELNET_CHECKVAL_RDONLY)?0:1,
+                            "help",websrv_utils_testhlp(websrvparams.fpath,module,cmdtitle,wdata->columns[i].coltitle)  );
       json_array_append_new(jcols,acol);                   
       }    
 	for (int i=0; i<wdata->numlines ; i++) {
@@ -224,7 +225,7 @@ int websrv_callback_set_moduleparams(const struct _u_request *request, struct _u
                  if (cmd->cmdflags & TELNETSRV_CMDFLAG_WEBSRV_SETRETURNTBL) {
                     httpstatus=1000;
                     websrv_printf_end(httpstatus,websrvparams.dbglvl); 
-                    websrv_gettbldata_response(response,&datatbl);
+                    websrv_gettbldata_response(response,&datatbl,modulestruct->module,cmd->cmdname);
                     return U_CALLBACK_COMPLETE;  
                  }
                  break;
@@ -247,10 +248,6 @@ int websrv_callback_get_softmodemhelp(const struct _u_request * request, struct 
   if (hlpfile!=NULL) {
     char *hlppath=malloc(strlen(hlpfile)+strlen(websrvparams.fpath)+1);
     sprintf(hlppath,"%s/%s",websrvparams.fpath,hlpfile);
-    int st=access(hlppath,R_OK);
-    if(st<0) {
-	  websrv_utils_build_hlpfile(hlppath) ;
-	}
     help_string = websrv_read_file(hlppath);
     if (help_string == NULL) {
 	  help_string = strdup("Help file not found");
@@ -434,7 +431,7 @@ int websrv_processwebfunc(struct _u_response * response, cmdparser_t * modulestr
 	  }
 	}
 	cmd->webfunc_getdata(cmd->cmdname,websrvparams.dbglvl,(webdatadef_t *)&wdata,NULL);	  
-	websrv_gettbldata_response(response,&wdata);
+	websrv_gettbldata_response(response,&wdata,modulestruct->module,cmd->cmdname);
   } else {
     websrv_printf_start(response,16384);
     char *sptr=index(cmd->cmdname,' ');
@@ -529,7 +526,7 @@ int websrv_callback_get_softmodemvar(const struct _u_request * request, struct _
 	     websrv_printjson("oneaction",oneaction,websrvparams.dbglvl);
        }   
 	   free(strval);
-       json_array_append(modulevars , oneaction);
+       json_array_append_new(modulevars , oneaction);
      }
      if (json_array_size(modulevars) == 0) {
 	   LOG_I(UTIL,"[websrv] no defined variables for %s\n",modulestruct->module);
@@ -572,27 +569,30 @@ int websrv_callback_get_softmodemcmd(const struct _u_request * request, struct _
 		  snprintf(confstr,sizeof(confstr),"Confirm %s ?",modulestruct->cmd[j].cmdname);
 		  acmd =json_pack( "{s:s,s:s}", "name",modulestruct->cmd[j].cmdname,"confirm", confstr);
 		} else if (modulestruct->cmd[j].cmdflags &  TELNETSRV_CMDFLAG_NEEDPARAM) {
+			char *pname=NULL;
+			char *question=NULL;
+			char *helpcp=NULL;
 			if (modulestruct->cmd[j].helpstr != NULL) {
 				char *tokptr;
-				char *helpcp=strdup(modulestruct->cmd[j].helpstr);
-				char *question=strtok_r( helpcp,"<[",&tokptr);
-				char *pname = (question!=NULL)?strtok_r(helpcp,">]",&tokptr):NULL;
-				acmd =json_pack( "{s:s,s:{s:s,s:s,s:s}}", "name",modulestruct->cmd[j].cmdname,"question","display",
-				                (question==NULL)?"":question , "pname",(pname==NULL)?"Px":pname,"type","string");
-				free(helpcp);
+				helpcp=strdup(modulestruct->cmd[j].helpstr);
+				question=strtok_r( helpcp,"<[",&tokptr);
+				pname = (question!=NULL)?strtok_r(helpcp,">]",&tokptr):NULL;
 			}
+			acmd =json_pack( "{s:s,s:{s:s,s:s,s:s}}", "name",modulestruct->cmd[j].cmdname,"question","display",
+				             (question==NULL)?"":question , "pname",(pname==NULL)?"Px":pname,"type","string");
+			free(helpcp);	             
 		}else {
 		  acmd =json_pack( "{s:s}", "name",modulestruct->cmd[j].cmdname);
 	    }
 	    json_t *jopts = json_array();
 	    if(modulestruct->cmd[j].cmdflags &  TELNETSRV_CMDFLAG_AUTOUPDATE) {
-		  json_array_append(jopts , json_string("update"));
+		  json_array_append_new(jopts , json_string("update"));
         }
         if ( json_array_size(jopts) > 0 ) {
 		  json_t *cmdoptions=json_pack("{s:o}","options",jopts);
 		  json_object_update_missing(acmd, cmdoptions);
 	    }
-	    json_array_append(modulesubcom , acmd);
+	    json_array_append_new(modulesubcom , acmd);
       }
       if (modulesubcom==NULL) {
 	      LOG_E(UTIL,"[websrv] cannot encode modulesubcom response for %s\n",modulestruct->module);
@@ -618,7 +618,7 @@ int websrv_callback_get_softmodemmodules(const struct _u_request * request, stru
   json_t *cmdnames = json_array();
   for (int i=0; telnetparams->CmdParsers[i].var != NULL && telnetparams->CmdParsers[i].cmd != NULL; i++) {
 	  json_t *acmd =json_pack( "{s:s}", "name",telnetparams->CmdParsers[i].module);
-	  json_array_append(cmdnames, acmd);
+	  json_array_append_new(cmdnames, acmd);
     }
 
   
@@ -804,10 +804,12 @@ void* websrv_autoinit() {
   // init softscope interface support */
    websrv_init_scope(&websrvparams) ;
    
-  //8 init websocket */
+  // init websocket */
    websrv_init_websocket(&websrvparams,"softscope") ;
 
-    
+  // build some html files in the server repo
+  websrv_utils_build_hlpfiles(websrvparams.fpath);
+  
   // Start the framework
   ret=U_ERROR;
   if (websrvparams.keyfile!=NULL && websrvparams.certfile!=NULL) {

@@ -47,31 +47,49 @@ typedef struct {
   char *buffptr;                  // pointer to free portion of buff
 } websrv_printf_t;
 static websrv_printf_t websrv_printf_buff; 
-
+/*--------------------- functions for help ------------------------*/
 /* possibly build a help file to be downloaded by the frontend */
 void websrv_utils_build_hlpfile(char *fname) {
+	
   char *info=NULL;
 
   if (strstr(fname,"core.html") != NULL) {
       long number_of_processors = sysconf(_SC_NPROCESSORS_ONLN);
       if (number_of_processors > 0) {
 		char *pinfo=malloc(255);
-		snprintf(pinfo,254,"Available cores on this system: 0 to %d",(int)number_of_processors);
+		snprintf(pinfo,254,"Available cores on this system: 0 to %d",(int)number_of_processors-1);
 		info=pinfo;
 	  }
     }
   if (info != NULL) {
     FILE *f=fopen(fname, "w");
     if (f == NULL) {
-	  LOG_I(UTIL,"[websrv]: Help file %s couldn't be creared\n",fname);
+	  LOG_I(UTIL,"[websrv]: Help file %s couldn't be created\n",fname);
     } else {	  
 	  fprintf(f,"%s",info);
 	  fclose(f);
-      free(info);
     }
+    free(info);
   }
 }
 
+void websrv_utils_build_hlpfiles(char *path) {
+	char fname[255];
+	snprintf(fname,sizeof(fname),"%s/helpfiles/softmodem_show_threadsched_core.html",path);
+	websrv_utils_build_hlpfile(fname);
+}
+int websrv_utils_testhlp(char *dir, char *module,char *cmdtitle, char *coltitle) {
+  char fname[255];
+ 
+  snprintf(fname,sizeof(fname)-1,"%s/helpfiles/%s_%s_%s.html",dir,module,cmdtitle,coltitle);
+  for (int i=0;i<strlen(fname);i++) {
+	  if (fname[i]==' ') fname[i]='_';
+  }
+  int st=access(fname,R_OK);	
+  return ((st==0)?1:0);
+}
+/*-----------------------------------------------------------*/
+/* functions http request/response helpers                  */
 /* dump a json objects */
 void websrv_printjson(char * label, json_t *jsonobj, int dbglvl){
 	if (dbglvl>0) {
@@ -132,7 +150,7 @@ int websrv_string_response(char *astring, struct _u_response * response, int htt
   websrv_jbody(response,jbody,httpstatus,dbglvl);
   return 0; 
 }
-
+/*----------------------------------------------------------------------------------*/
 /* set of calls to fill a buffer with a string and  use this buffer in a response */
 void websrv_printf_start(struct _u_response * response, int buffsize ) {
   pthread_mutex_lock(&(websrv_printf_buff.mutex));	
