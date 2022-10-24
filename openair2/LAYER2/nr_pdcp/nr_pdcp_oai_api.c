@@ -219,6 +219,7 @@ typedef struct {
   rb_id_t         rb_id;
   sdu_size_t      sdu_buffer_size;
   mem_block_t     *sdu_buffer;
+  int             sn_latseq;
 } pdcp_data_ind_queue_item;
 
 #define PDCP_DATA_IND_QUEUE_SIZE 10000
@@ -239,7 +240,8 @@ static void do_pdcp_data_ind(
   const MBMS_flag_t MBMS_flagP,
   const rb_id_t rb_id,
   const sdu_size_t sdu_buffer_size,
-  mem_block_t *const sdu_buffer)
+  mem_block_t *const sdu_buffer,
+  int sn_latseq)
 {
   nr_pdcp_ue_t *ue;
   nr_pdcp_entity_t *rb;
@@ -274,8 +276,8 @@ static void do_pdcp_data_ind(
   }
 
   if (rb != NULL) {
-    LATSEQ_P("U pdcp.pdu.pull--pdcp.pdu.decoded", "len%d::rb_id%d.pdusession_id%d.memblck_poolid%d.bufaddress%d", sdu_buffer_size, rb_id, rb->pdusession_id, sdu_buffer->pool_id, &(sdu_buffer->data));
-    rb->recv_pdu(rb, (char *)sdu_buffer->data, sdu_buffer_size);
+    LATSEQ_P("U pdcp.pdu.pull--pdcp.pdu.decoded", "len%d::sn%d", sdu_buffer_size, sn_latseq);
+    rb->recv_pdu(rb, (char *)sdu_buffer->data, sdu_buffer_size, sn_latseq);
   } else {
     LOG_E(PDCP, "%s:%d:%s: no RB found (rb_id %ld, srb_flag %d)\n",
           __FILE__, __LINE__, __FUNCTION__, rb_id, srb_flagP);
@@ -303,7 +305,8 @@ static void *pdcp_data_ind_thread(void *_)
                      pq.q[i].MBMS_flagP,
                      pq.q[i].rb_id,
                      pq.q[i].sdu_buffer_size,
-                     pq.q[i].sdu_buffer);
+                     pq.q[i].sdu_buffer,
+                     pq.q[i].sn_latseq);
 
     if (pthread_mutex_lock(&pq.m) != 0) abort();
 
@@ -334,7 +337,8 @@ static void enqueue_pdcp_data_ind(
   const MBMS_flag_t MBMS_flagP,
   const rb_id_t rb_id,
   const sdu_size_t sdu_buffer_size,
-  mem_block_t *const sdu_buffer)
+  mem_block_t *const sdu_buffer,
+  int sn_latseq)
 {
   int i;
   int logged = 0;
@@ -350,7 +354,7 @@ static void enqueue_pdcp_data_ind(
 
   i = (pq.start + pq.length) % PDCP_DATA_IND_QUEUE_SIZE;
   pq.length++;
-  LATSEQ_P("U pdcp.pdu.enqueue--pdcp.pdu.pull", "len%d::rb_id%d.memblck_poolid%d", sdu_buffer_size, rb_id, sdu_buffer->pool_id);
+  LATSEQ_P("U pdcp.pdu.enqueue--pdcp.pdu.pull", "len%d::sn%d", sdu_buffer_size, sn_latseq);
 
   pq.q[i].ctxt_pP         = *ctxt_pP;
   pq.q[i].srb_flagP       = srb_flagP;
@@ -358,6 +362,7 @@ static void enqueue_pdcp_data_ind(
   pq.q[i].rb_id           = rb_id;
   pq.q[i].sdu_buffer_size = sdu_buffer_size;
   pq.q[i].sdu_buffer      = sdu_buffer;
+  pq.q[i].sn_latseq       = sn_latseq;
 
   if (pthread_cond_signal(&pq.c) != 0) abort();
   if (pthread_mutex_unlock(&pq.m) != 0) abort();
@@ -370,14 +375,16 @@ bool pdcp_data_ind(const protocol_ctxt_t *const  ctxt_pP,
                    const sdu_size_t sdu_buffer_size,
                    mem_block_t *const sdu_buffer,
                    const uint32_t *const srcID,
-                   const uint32_t *const dstID)
+                   const uint32_t *const dstID,
+                   const int sn_latseq)
 {
   enqueue_pdcp_data_ind(ctxt_pP,
                         srb_flagP,
                         MBMS_flagP,
                         rb_id,
                         sdu_buffer_size,
-                        sdu_buffer);
+                        sdu_buffer,
+                        sn_latseq);
   return true;
 }
 
@@ -617,7 +624,7 @@ uint64_t nr_pdcp_module_init(uint64_t _pdcp_optmask, int id)
 }
 
 static void deliver_sdu_drb(void *_ue, nr_pdcp_entity_t *entity,
-                            char *buf, int size)
+                            char *buf, int size, int sn_latseq)
 {
   nr_pdcp_ue_t *ue = _ue;
   int rb_id;
@@ -632,7 +639,8 @@ static void deliver_sdu_drb(void *_ue, nr_pdcp_entity_t *entity,
                   entity->pdusession_id,
                   ue->rnti,
                   buf,
-                  size);
+                  size,
+                  -956);
   }
   else{
     for (i = 0; i < 5; i++) {
@@ -649,7 +657,7 @@ static void deliver_sdu_drb(void *_ue, nr_pdcp_entity_t *entity,
     rb_found:
     {
       LOG_D(PDCP, "%s() (drb %d) sending message to SDAP size %d\n", __func__, rb_id, size);
-      LATSEQ_P("U pdcp.sdu.push--sdap.pdu", "len%d::rb_id%d.pdusession_id%d.bufaddress%d", size, rb_id, ue->drb[rb_id-1]->pdusession_id, buf);
+      LATSEQ_P("U pdcp.sdu.push--sdap.pdu", "len%d::sn%d", size, sn_latseq);
       sdap_data_ind(rb_id,
                     ue->drb[rb_id-1]->is_gnb,
                     ue->drb[rb_id-1]->has_sdap,
@@ -657,7 +665,8 @@ static void deliver_sdu_drb(void *_ue, nr_pdcp_entity_t *entity,
                     ue->drb[rb_id-1]->pdusession_id,
                     ue->rnti,
                     buf,
-                    size);
+                    size,
+                    sn_latseq);
     }
   }
 }
@@ -724,7 +733,7 @@ rb_found:
 }
 
 static void deliver_sdu_srb(void *_ue, nr_pdcp_entity_t *entity,
-                            char *buf, int size)
+                            char *buf, int size, int sn_latseq)
 {
   nr_pdcp_ue_t *ue = _ue;
   int srb_id;
@@ -1389,7 +1398,7 @@ bool cu_f1u_data_req(protocol_ctxt_t  *ctxt_pP,
     exit(1);
   }
   memcpy(memblock->data,sdu_buffer, sdu_buffer_size);
-  int ret=pdcp_data_ind(ctxt_pP,srb_flagP, false, rb_id, sdu_buffer_size, memblock, NULL, NULL);
+  int ret=pdcp_data_ind(ctxt_pP,srb_flagP, false, rb_id, sdu_buffer_size, memblock, NULL, NULL, -24870);
   if (!ret) {
     LOG_E(RLC, "%s:%d:%s: ERROR: pdcp_data_ind failed\n", __FILE__, __LINE__, __FUNCTION__);
     /* what to do in case of failure? for the moment: nothing */

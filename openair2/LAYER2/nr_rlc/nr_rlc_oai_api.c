@@ -459,7 +459,7 @@ void rlc_util_print_hex_octets(comp_name_t componentP, unsigned char *dataP, con
 {
 }
 
-static void deliver_sdu(void *_ue, nr_rlc_entity_t *entity, char *buf, int size)
+static void deliver_sdu(void *_ue, nr_rlc_entity_t *entity, char *buf, int size, int sn_latseq)
 {
   nr_rlc_ue_t *ue = _ue;
   int is_srb;
@@ -561,8 +561,8 @@ rb_found:
   }
   memcpy(memblock->data, buf, size);
   LOG_D(PDCP, "Calling PDCP layer from RLC in %s\n", __FUNCTION__);
-  LATSEQ_P("U rlc.sdu.push--pdcp.pdu.enqueue", "len%d::rb_id%d.memblck_poolid%d.bufaddress%d", size, rb_id, memblock->pool_id, buf);
-  if (!pdcp_data_ind(&ctx, is_srb, 0, rb_id, size, memblock, NULL, NULL)) {
+  LATSEQ_P("U rlc.sdu.push--pdcp.pdu.enqueue", "len%d::sn%d", size, sn_latseq);
+  if (!pdcp_data_ind(&ctx, is_srb, 0, rb_id, size, memblock, NULL, NULL, sn_latseq)) {
     LOG_E(RLC, "%s:%d:%s: ERROR: pdcp_data_ind failed\n", __FILE__, __LINE__, __FUNCTION__);
     /* what to do in case of failure? for the moment: nothing */
   }

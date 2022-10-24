@@ -33,7 +33,7 @@ nr_rlc_entity_t *new_nr_rlc_entity_am(
     int rx_maxsize,
     int tx_maxsize,
     void (*deliver_sdu)(void *deliver_sdu_data, struct nr_rlc_entity_t *entity,
-                      char *buf, int size),
+                      char *buf, int size, int sn_latseq),
     void *deliver_sdu_data,
     void (*sdu_successful_delivery)(void *sdu_successful_delivery_data,
                                     struct nr_rlc_entity_t *entity,
@@ -101,7 +101,7 @@ nr_rlc_entity_t *new_nr_rlc_entity_um(
     int rx_maxsize,
     int tx_maxsize,
     void (*deliver_sdu)(void *deliver_sdu_data, struct nr_rlc_entity_t *entity,
-                      char *buf, int size),
+                      char *buf, int size, int sn_latseq),
     void *deliver_sdu_data,
     int t_reassembly,
     int sn_field_length)
@@ -147,7 +147,7 @@ nr_rlc_entity_t *new_nr_rlc_entity_um(
 nr_rlc_entity_t *new_nr_rlc_entity_tm(
     int tx_maxsize,
     void (*deliver_sdu)(void *deliver_sdu_data, struct nr_rlc_entity_t *entity,
-                      char *buf, int size),
+                      char *buf, int size, int sn_latseq),
     void *deliver_sdu_data)
 {
   nr_rlc_entity_tm_t *ret;

@@ -219,10 +219,10 @@ static void reassemble_and_deliver(nr_rlc_entity_am_t *entity, int sn)
     return;
 
   /* deliver */
-  LATSEQ_P("U rlc.reassembled--rlc.sdu.push", "len%d::bufaddress%d.sn%d", so, sdu, sn);
+  LATSEQ_P("U rlc.reassembled--rlc.sdu.push", "len%d::sn%d", so, sn);
   entity->common.deliver_sdu(entity->common.deliver_sdu_data,
                              (nr_rlc_entity_t *)entity,
-                             sdu, so);
+                             sdu, so, sn);
 }
 
 static void reception_actions(nr_rlc_entity_am_t *entity, nr_rlc_pdu_t *pdu)
@@ -717,7 +717,7 @@ void nr_rlc_entity_am_recv_pdu(nr_rlc_entity_t *_entity,
 
   data_size = size - decoder.byte;
 
-  LATSEQ_P("U rlc.pdu.decoded--rlc.pdu.receive", "len%d::bufaddress%d.dc%d.p%d.si%d.sn%d.so%d", data_size, buffer, dc, p, si, sn, so);
+  LATSEQ_P("U rlc.pdu.decoded--rlc.pdu.receive", "len%d::bufaddress%u.dc%d.p%d.si%d.sn%d.so%d", data_size, buffer, dc, p, si, sn, so);
 
   /* dicard PDU if no data */
   if (data_size <= 0) {

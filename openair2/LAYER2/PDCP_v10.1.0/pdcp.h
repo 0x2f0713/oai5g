@@ -53,7 +53,7 @@ typedef rlc_op_status_t  (*send_rlc_data_req_func_t)(const protocol_ctxt_t *cons
 
 typedef bool (pdcp_data_ind_t)( const protocol_ctxt_t *, const srb_flag_t,
 						 const MBMS_flag_t, const rb_id_t, const sdu_size_t,
-						 mem_block_t *,const uint32_t *const, const uint32_t *const);
+						 mem_block_t *,const uint32_t *const, const uint32_t *const, const int);
 typedef pdcp_data_ind_t* pdcp_data_ind_func_t;
 
 #define MAX_NUMBER_NETIF                 1 //16

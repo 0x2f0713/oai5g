@@ -34,7 +34,7 @@
 #include "common/utils/LATSEQ/latseq.h"
 
 static void nr_pdcp_entity_recv_pdu(nr_pdcp_entity_t *entity,
-                                    char *_buffer, int size)
+                                    char *_buffer, int size, int sn_latseq)
 {
   unsigned char    *buffer = (unsigned char *)_buffer;
   nr_pdcp_sdu_t    *sdu;
@@ -118,7 +118,7 @@ static void nr_pdcp_entity_recv_pdu(nr_pdcp_entity_t *entity,
     LOG_W(PDCP, "discard NR PDU rcvd_count=%d, entity->rx_deliv %d,sdu_in_list %d\n", rcvd_count,entity->rx_deliv,nr_pdcp_sdu_in_list(entity->rx_list,rcvd_count));
     return;
   }
-  LATSEQ_P("U pdcp.pdu.decoded--pdcp.sdu.push", "len%d::pdcpheadersize%d.integritysize%d.rb_id%d.pdusession_id%d.rcvd_sn%d.recv_count%d.rcvd_hfn%d.rx_deliv_sn%d.rx_deliv_hfn%d", size, header_size, integrity_size, entity->rb_id, entity->pdusession_id, rcvd_sn, rcvd_count, rcvd_hfn, rx_deliv_sn, rx_deliv_hfn);
+  LATSEQ_P("U pdcp.pdu.decoded--pdcp.sdu.push", "len%d::sn%d", size, rcvd_sn);
 
   sdu = nr_pdcp_new_sdu(rcvd_count,
                         (char *)buffer + header_size,
@@ -138,7 +138,7 @@ static void nr_pdcp_entity_recv_pdu(nr_pdcp_entity_t *entity,
     while (entity->rx_list != NULL && count == entity->rx_list->count) {
       nr_pdcp_sdu_t *cur = entity->rx_list;
       entity->deliver_sdu(entity->deliver_sdu_data, entity,
-                          cur->buffer, cur->size);
+                          cur->buffer, cur->size, rcvd_sn);
       entity->rx_list = cur->next;
       entity->rx_size -= cur->size;
       nr_pdcp_free_sdu(cur);
@@ -300,7 +300,7 @@ static void check_t_reordering(nr_pdcp_entity_t *entity)
   while (entity->rx_list != NULL && entity->rx_list->count < entity->rx_reord) {
     nr_pdcp_sdu_t *cur = entity->rx_list;
     entity->deliver_sdu(entity->deliver_sdu_data, entity,
-                        cur->buffer, cur->size);
+                        cur->buffer, cur->size, -2462);
     entity->rx_list = cur->next;
     entity->rx_size -= cur->size;
     nr_pdcp_free_sdu(cur);
@@ -311,7 +311,7 @@ static void check_t_reordering(nr_pdcp_entity_t *entity)
   while (entity->rx_list != NULL && count == entity->rx_list->count) {
     nr_pdcp_sdu_t *cur = entity->rx_list;
     entity->deliver_sdu(entity->deliver_sdu_data, entity,
-                        cur->buffer, cur->size);
+                        cur->buffer, cur->size, -4235);
     entity->rx_list = cur->next;
     entity->rx_size -= cur->size;
     nr_pdcp_free_sdu(cur);
@@ -353,7 +353,7 @@ nr_pdcp_entity_t *new_nr_pdcp_entity(
     int is_gnb, int rb_id, int pdusession_id,int has_sdap,
     int has_sdapULheader, int has_sdapDLheader,
     void (*deliver_sdu)(void *deliver_sdu_data, struct nr_pdcp_entity_t *entity,
-                        char *buf, int size),
+                        char *buf, int size, int sn_latseq),
     void *deliver_sdu_data,
     void (*deliver_pdu)(void *deliver_pdu_data, struct nr_pdcp_entity_t *entity,
                         char *buf, int size, int sdu_id),

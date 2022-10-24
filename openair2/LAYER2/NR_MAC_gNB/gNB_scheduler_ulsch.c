@@ -338,7 +338,7 @@ int nr_process_mac_pdu( instance_t module_idP,
                   mac_len);
             UE->mac_stats.ul.lc_bytes[rx_lcid] += mac_len;
             
-            LATSEQ_P("U mac.sdu.push--rlc.pdu.decoded", "len%d::frame%d.slot%d.carriercompid%d.lcid%d.bufaddress%d", mac_len, frameP, slot, CC_id, rx_lcid, pduP+mac_subheader_len);
+            LATSEQ_P("U mac.sdu.push--rlc.pdu.decoded", "len%d::frame%d.slot%d.carriercompid%d.lcid%d.bufaddress%u", mac_len, frameP, slot, CC_id, rx_lcid, pduP+mac_subheader_len);
             mac_rlc_data_ind(module_idP,
                              UE->rnti,
                              module_idP,

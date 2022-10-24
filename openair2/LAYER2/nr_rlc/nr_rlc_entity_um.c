@@ -178,7 +178,7 @@ static void reassemble_and_deliver(nr_rlc_entity_um_t *entity, int sn)
   /* deliver */
   entity->common.deliver_sdu(entity->common.deliver_sdu_data,
                              (nr_rlc_entity_t *)entity,
-                             sdu, so);
+                             sdu, so, -1234);
 }
 
 static void reception_actions(nr_rlc_entity_um_t *entity, nr_rlc_pdu_t *pdu)
@@ -289,7 +289,7 @@ void nr_rlc_entity_um_recv_pdu(nr_rlc_entity_t *_entity,
     /* deliver */
     entity->common.deliver_sdu(entity->common.deliver_sdu_data,
                                (nr_rlc_entity_t *)entity,
-                               buffer + 1, size - 1);
+                               buffer + 1, size - 1, -12345);
     return;
   }
 

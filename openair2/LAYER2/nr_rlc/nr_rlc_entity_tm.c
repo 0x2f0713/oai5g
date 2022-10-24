@@ -38,7 +38,7 @@ void nr_rlc_entity_tm_recv_pdu(nr_rlc_entity_t *_entity,
   nr_rlc_entity_tm_t *entity = (nr_rlc_entity_tm_t *)_entity;
   entity->common.deliver_sdu(entity->common.deliver_sdu_data,
                              (nr_rlc_entity_t *)entity,
-                             buffer, size);
+                             buffer, size, -12346);
 }
 
 /*************************************************************************/
