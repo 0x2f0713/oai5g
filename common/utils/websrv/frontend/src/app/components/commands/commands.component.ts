@@ -95,10 +95,10 @@ export class CommandsComponent {
     this.cmds$ = this.commandsApi.readCommands$(module.name).pipe(
       map(icmds => icmds.map(icmd => new CmdCtrl(icmd))),
       map(cmds => {
-		for (let i=0; i<cmds.length;i++) { 
-		  cmds[i].get_cmd_help(  this.helpApi, module.name)
-		}
         module.cmdsFA = new UntypedFormArray(cmds) 
+ 		for (let i=0; i<cmds.length;i++) { 
+		  cmds[i].get_cmd_help(  this.helpApi, module.name)
+		}       
         return module.cmdsFA.controls as CmdCtrl[]
       })
     )
