@@ -37,7 +37,7 @@ extern double cpu_freq_GHz  __attribute__ ((aligned(32)));;
 // structure to store data to compute cpu measurment
 #if defined(__x86_64__) || defined(__i386__)
   typedef long long oai_cputime_t;
-#elif defined(__arm__)
+#elif defined(__arm__) || defined(__aarch64__)
   typedef uint32_t oai_cputime_t;
 #else
   #error "building on unsupported CPU architecture"
@@ -62,7 +62,7 @@ typedef struct time_stats {
   oai_cputime_t in;          /*!< \brief time at measure starting point */
   oai_cputime_t diff;        /*!< \brief average difference between time at starting point and time at endpoint*/
   oai_cputime_t p_time;      /*!< \brief absolute process duration */
-  oai_cputime_t diff_square; /*!< \brief process duration square */
+  double diff_square;        /*!< \brief process duration square */
   oai_cputime_t max;         /*!< \brief maximum difference between time at starting point and time at endpoint*/
   int trials;                /*!< \brief number of start point - end point iterations */
   int meas_flag;             /*!< \brief 1: stop_meas not called (consecutive calls of start_meas) */
@@ -107,7 +107,7 @@ static inline unsigned long long rdtsc_oai(void) {
   return (d<<32) | a;
 }
 
-#elif defined(__arm__)
+#elif defined(__arm__) || defined(__aarch64__)
 static inline uint32_t rdtsc_oai(void) __attribute__((always_inline));
 static inline uint32_t rdtsc_oai(void) {
   uint32_t r = 0;
@@ -156,7 +156,7 @@ static inline void stop_meas(time_stats_t *ts) {
     ts->diff += (out-ts->in);
     /// process duration is the difference between two clock points
     ts->p_time = (out-ts->in);
-    ts->diff_square += (out-ts->in)*(out-ts->in);
+    ts->diff_square += ((double)out-ts->in)*((double)out-ts->in);
 
     if ((out-ts->in) > ts->max)
       ts->max = out-ts->in;

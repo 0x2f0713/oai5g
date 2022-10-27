@@ -2,6 +2,7 @@ import { UntypedFormArray, UntypedFormControl, UntypedFormGroup } from '@angular
 import { Subscription } from 'rxjs';
 import { Observable } from 'rxjs/internal/Observable';
 import { ICommand, ICommandOptions, IQuestion } from 'src/app/api/commands.api';
+import {HelpApi, HelpRequest,HelpResp} from 'src/app/api/help.api';
 
 const enum CmdFCN {
   name = 'name',
@@ -19,6 +20,8 @@ export class CmdCtrl extends UntypedFormGroup {
   public ResUpdTimer?: Observable<number>
   public ResUpdTimerSubscriber?: Subscription
   updbtnname: string
+  hlp_cmd:string = ""
+ 
   constructor(cmd: ICommand) {
     super({});
 
@@ -88,6 +91,18 @@ export class CmdCtrl extends UntypedFormGroup {
 
   set varsFA(fa: UntypedFormArray) {
     this.setControl(CmdFCN.vars, fa);
+  }
+  
+  public get_cmd_help(  helpApi: HelpApi, module:string) {
+		  if (this.options) {
+			 for (let j=0; j<this.options!.length;j++) {
+				if (this.options![j] == ICommandOptions.help) {
+                  helpApi.getHelpText("cmd",module,this.cmdname).subscribe( 
+                    resp => { this.hlp_cmd=resp; },
+	                err =>   { this.hlp_cmd=""; } );
+		      }
+		    }
+	      }
   }
 }
 

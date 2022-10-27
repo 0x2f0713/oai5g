@@ -44,10 +44,6 @@ import datetime
 import signal
 import statistics as stat
 from multiprocessing import Process, Lock, SimpleQueue
-logging.basicConfig(
-	level=logging.DEBUG,
-	format="[%(asctime)s] %(name)s:%(levelname)s: %(message)s"
-)
 
 #import our libs
 import helpreadme as HELP
@@ -263,10 +259,10 @@ class OaiCiTest():
 		if self.ranAllowMerge:
 			if self.ranTargetBranch == '':
 				if (self.ranBranch != 'develop') and (self.ranBranch != 'origin/develop'):
-					SSH.command('git merge --ff origin/develop -m "Temporary merge for CI"', '\$', 5)
+					SSH.command('git merge --ff origin/develop -m "Temporary merge for CI"', '\$', 30)
 			else:
 				logging.debug('Merging with the target branch: ' + self.ranTargetBranch)
-				SSH.command('git merge --ff origin/' + self.ranTargetBranch + ' -m "Temporary merge for CI"', '\$', 5)
+				SSH.command('git merge --ff origin/' + self.ranTargetBranch + ' -m "Temporary merge for CI"', '\$', 30)
 		SSH.command('source oaienv', '\$', 5)
 		SSH.command('cd cmake_targets', '\$', 5)
 		SSH.command('mkdir -p log', '\$', 5)
@@ -526,7 +522,7 @@ class OaiCiTest():
 				else:
 					SSH.command('sed -e "s#93#92#" -e "s#8baf473f2f8fd09487cccbd7097c6862#fec86ba6eb707ed08905757b1bb44b8f#" -e "s#e734f8734007d6c5ce7a0508809e7e9c#C42449363BBAD02B66D16BC975D77CC1#" ../../../openair3/NAS/TOOLS/ue_eurecom_test_sfr.conf > ../../../openair3/NAS/TOOLS/ci-ue_eurecom_test_sfr.conf', '\$', 5)
 				SSH.command('echo ' + self.UEPassword + ' | sudo -S rm -Rf .u*', '\$', 5)
-				SSH.command('echo ' + self.UEPassword + ' | sudo -S ../../../targets/bin/conf2uedata -c ../../../openair3/NAS/TOOLS/ci-ue_eurecom_test_sfr.conf -o .', '\$', 5)
+				SSH.command('echo ' + self.UEPassword + ' | sudo -S ../../nas_sim_tools/build/conf2uedata -c ../../../openair3/NAS/TOOLS/ci-ue_eurecom_test_sfr.conf -o .', '\$', 5)
 		else:
 			SSH.command('if [ -e rbconfig.raw ]; then echo ' + self.UEPassword + ' | sudo -S rm rbconfig.raw; fi', '\$', 5)
 			SSH.command('if [ -e reconfig.raw ]; then echo ' + self.UEPassword + ' | sudo -S rm reconfig.raw; fi', '\$', 5)
@@ -1329,7 +1325,7 @@ class OaiCiTest():
 		SSH.open(self.ADBIPAddress, self.ADBUserName, self.ADBPassword)
 		if self.ADBCentralized:
 			SSH.command('adb devices', '\$', 15)
-			self.UEDevices = re.findall("\\\\r\\\\n([A-Za-z0-9]+)\\\\tdevice",SSH.getBefore())
+			self.UEDevices = re.findall('\r\n([A-Za-z0-9]+)\tdevice',SSH.getBefore())
 			#report number and id of devices found
 			msg = "UEDevices found by GetAllUEDevices : " + " ".join(self.UEDevices)
 			logging.debug(msg)
@@ -1379,8 +1375,7 @@ class OaiCiTest():
 		SSH.open(self.ADBIPAddress, self.ADBUserName, self.ADBPassword)
 		if self.ADBCentralized:
 			SSH.command('lsusb | egrep --colour=never "Future Technology Devices International, Ltd FT2232C" | sed -e "s#:.*##" -e "s# #_#g"', '\$', 15)
-			#self.CatMDevices = re.findall("\\\\r\\\\n([A-Za-z0-9_]+)",SSH.getBefore())
-			self.CatMDevices = re.findall("\\\\r\\\\n([A-Za-z0-9_]+)",SSH.getBefore())
+			self.CatMDevices = re.findall('\r\n([A-Za-z0-9_]+)',SSH.getBefore())
 		else:
 			if (os.path.isfile('./modules_list.txt')):
 				os.remove('./modules_list.txt')
@@ -1666,7 +1661,7 @@ class OaiCiTest():
 					logging.debug("Ping analysis from Amarisoft scenario")
 					path,ping_log_file = os.path.split(Module_UE.Ping)
 					SSH.open(Module_UE.HostIPAddress, Module_UE.HostUsername, Module_UE.HostPassword)
-					SSH.command('cat ' + Module_UE.Ping, '\#', 5)
+					SSH.command('cat ' + Module_UE.Ping, '\$', 5)
 
 				else:
 					ping_status=-1
@@ -2046,7 +2041,7 @@ class OaiCiTest():
 				req_bandwidth = '%.1f Gbits/sec' % req_bw
 				req_bw = req_bw * 1000000000
 
-		result = re.search('Server Report:\\\\r\\\\n(?:|\[ *\d+\].*) (?P<bitrate>[0-9\.]+ [KMG]bits\/sec) +(?P<jitter>[0-9\.]+ ms) +(\d+\/..\d+) +(\((?P<packetloss>[0-9\.]+)%\))', SSH.getBefore())
+		result = re.search('Server Report:\r\n(?:|\[ *\d+\].*) (?P<bitrate>[0-9\.]+ [KMG]bits\/sec) +(?P<jitter>[0-9\.]+ ms) +(\d+\/..\d+) +(\((?P<packetloss>[0-9\.]+)%\))', SSH.getBefore())
 		if result is not None:
 			bitrate = result.group('bitrate')
 			packetloss = result.group('packetloss')
@@ -2262,7 +2257,7 @@ class OaiCiTest():
 
 	def Iperf_analyzeV3Output(self, lock, UE_IPAddress, device_id, statusQueue,SSH):
 
-		result = re.search('(?P<bitrate>[0-9\.]+ [KMG]bits\/sec) +(?:|[0-9\.]+ ms +\d+\/\d+ \((?P<packetloss>[0-9\.]+)%\)) +(?:|receiver)\\\\r\\\\n(?:|\[ *\d+\] Sent \d+ datagrams)\\\\r\\\\niperf Done\.', SSH.getBefore())
+		result = re.search('(?P<bitrate>[0-9\.]+ [KMG]bits\/sec) +(?:|[0-9\.]+ ms +\d+\/\d+ \((?P<packetloss>[0-9\.]+)%\)) +(?:|receiver)\r\n(?:|\[ *\d+\] Sent \d+ datagrams)\r\niperf Done\.', SSH.getBefore())
 		if result is None:
 			result = re.search('(?P<error>iperf: error - [a-zA-Z0-9 :]+)', SSH.getBefore())
 			lock.acquire()
@@ -2405,7 +2400,7 @@ class OaiCiTest():
 			if launchFromTrfContainer:
 				SSH.command('docker exec -it prod-trf-gen /bin/bash -c "killall --signal SIGKILL iperf"', '\$', 5)
 			else:
-				SSH.command('killall --signal SIGKILL iperf', EPC.UserName, 5)
+				SSH.command('killall --signal SIGKILL iperf', '\$', 5)
 			SSH.close()
 		else:
 			cmd = 'killall --signal SIGKILL iperf'
@@ -3129,7 +3124,7 @@ class OaiCiTest():
 				fileCheck = re.search('enb_', str(RAN.eNBLogFiles[0]))
 				if fileCheck is not None:
 					SSH.copyin(RAN.eNBIPAddress, RAN.eNBUserName, RAN.eNBPassword, RAN.eNBSourceCodePath + '/cmake_targets/' + RAN.eNBLogFiles[0], '.')
-					logStatus = RAN.AnalyzeLogFile_eNB(RAN.eNBLogFiles[0])
+					logStatus = RAN.AnalyzeLogFile_eNB(RAN.eNBLogFiles[0],HTML, RAN.ran_checkers)
 					if logStatus < 0:
 						result = logStatus
 					RAN.eNBLogFiles[0]=''
@@ -3865,7 +3860,7 @@ class OaiCiTest():
 		SSH = sshconnection.SSHConnection()
 		SSH.open(IPAddress, UserName, Password)
 		SSH.command('lsb_release -a', '\$', 5)
-		result = re.search('Description:\\\\t(?P<os_type>[a-zA-Z0-9\-\_\.\ ]+)', SSH.getBefore())
+		result = re.search('Description:\t(?P<os_type>[a-zA-Z0-9\-\_\.\ ]+)', SSH.getBefore())
 		if result is not None:
 			OsVersion = result.group('os_type')
 			logging.debug('OS is: ' + OsVersion)
@@ -3883,26 +3878,26 @@ class OaiCiTest():
 				logging.debug('OS is: ' + OsVersion)
 				HTML.OsVersion[idx]=OsVersion
 		SSH.command('uname -r', '\$', 5)
-		result = re.search('uname -r\\\\r\\\\n(?P<kernel_version>[a-zA-Z0-9\-\_\.]+)', SSH.getBefore())
+		result = re.search('uname -r\r\n(?P<kernel_version>[a-zA-Z0-9\-\_\.]+)', SSH.getBefore())
 		if result is not None:
 			KernelVersion = result.group('kernel_version')
 			logging.debug('Kernel Version is: ' + KernelVersion)
 			HTML.KernelVersion[idx]=KernelVersion
-		SSH.command('dpkg --list | egrep --color=never libuhd003', '\$', 5)
-		result = re.search('libuhd003:amd64 *(?P<uhd_version>[0-9\.]+)', SSH.getBefore())
+		SSH.command('dpkg --list | egrep --color=never libuhd', '\$', 5)
+		result = re.search('libuhd.*:amd64 *(?P<uhd_version>[0-9\.]+)', SSH.getBefore())
 		if result is not None:
 			UhdVersion = result.group('uhd_version')
 			logging.debug('UHD Version is: ' + UhdVersion)
 			HTML.UhdVersion[idx]=UhdVersion
 		else:
-			SSH.command('uhd_config_info --version', '\$', 5)
-			result = re.search('UHD (?P<uhd_version>[a-zA-Z0-9\.\-]+)', SSH.getBefore())
+			SSH.command('uhd_config_info --abi-version', '\$', 5)
+			result = re.search('ABI version string: (?P<uhd_version>[a-zA-Z0-9\.\-]+)', SSH.getBefore())
 			if result is not None:
 				UhdVersion = result.group('uhd_version')
 				logging.debug('UHD Version is: ' + UhdVersion)
 				HTML.UhdVersion[idx]=UhdVersion
 		SSH.command('echo ' + Password + ' | sudo -S uhd_find_devices', '\$', 180)
-		usrp_boards = re.findall('product: ([0-9A-Za-z]+)\\\\r\\\\n', SSH.getBefore())
+		usrp_boards = re.findall('product: ([0-9A-Za-z]+)', SSH.getBefore())
 		count = 0
 		for board in usrp_boards:
 			if count == 0:
@@ -3914,14 +3909,18 @@ class OaiCiTest():
 			logging.debug('USRP Board(s) : ' + UsrpBoard)
 			HTML.UsrpBoard[idx]=UsrpBoard
 		SSH.command('lscpu', '\$', 5)
-		result = re.search('CPU\(s\): *(?P<nb_cpus>[0-9]+).*Model name: *(?P<model>[a-zA-Z0-9\-\_\.\ \(\)]+).*CPU MHz: *(?P<cpu_mhz>[0-9\.]+)', SSH.getBefore())
+		result = re.search('CPU\(s\): *(?P<nb_cpus>[0-9]+)', SSH.getBefore())
 		if result is not None:
 			CpuNb = result.group('nb_cpus')
 			logging.debug('nb_cpus: ' + CpuNb)
 			HTML.CpuNb[idx]=CpuNb
+		result = re.search('Model name: *(?P<model>[a-zA-Z0-9\-\_\.\ \(\)]+)', SSH.getBefore())
+		if result is not None:
 			CpuModel = result.group('model')
 			logging.debug('model: ' + CpuModel)
 			HTML.CpuModel[idx]=CpuModel
+		result = re.search('CPU MHz: *(?P<cpu_mhz>[0-9\.]+)', SSH.getBefore())
+		if result is not None:
 			CpuMHz = result.group('cpu_mhz') + ' MHz'
 			logging.debug('cpu_mhz: ' + CpuMHz)
 			HTML.CpuMHz[idx]=CpuMHz
@@ -3934,7 +3933,7 @@ class OaiCiTest():
 		sys.exit(1)
 
 	def ShowTestID(self):
-		logging.debug('\u001B[1m----------------------------------------\u001B[0m')
-		logging.debug('\u001B[1mTest ID:' + self.testCase_id + '\u001B[0m')
-		logging.debug('\u001B[1m' + self.desc + '\u001B[0m')
-		logging.debug('\u001B[1m----------------------------------------\u001B[0m')
+		logging.info('\u001B[1m----------------------------------------\u001B[0m')
+		logging.info('\u001B[1mTest ID:' + self.testCase_id + '\u001B[0m')
+		logging.info('\u001B[1m' + self.desc + '\u001B[0m')
+		logging.info('\u001B[1m----------------------------------------\u001B[0m')

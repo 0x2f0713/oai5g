@@ -455,7 +455,8 @@ static void timeSignal (OAIgraph_t *graph, PHY_VARS_gNB *phy_vars_gnb, RU_t *phy
 */
 
 static void timeResponse (OAIgraph_t *graph, scopeData_t *p, int nb_UEs) {
-  const int len=2*p->gNB->frame_parms.ofdm_symbol_size;
+
+const int len=p->gNB->frame_parms.ofdm_symbol_size;
 #ifndef WEBSRVSCOPE  
   float *values, *time;
   oai_xygraph_getbuff(graph, &time, &values, len, 0);
@@ -515,13 +516,18 @@ static void frequencyResponse (OAIgraph_t *graph, PHY_VARS_gNB *phy_vars_gnb, RU
 */
 
 static void puschLLR (OAIgraph_t *graph, scopeData_t *p, int nb_UEs) {
-  //int Qm = 2;
-  int coded_bits_per_codeword =3*8*6144+12; // (8*((3*8*6144)+12)); // frame_parms->N_RB_UL*12*Qm*frame_parms->symbols_per_tti;
+
 #ifdef WEBSRVSCOPE
   int uestart=nb_UEs-1; // web scope shows one UE signal, that can be selected from GUI
 #else
   int uestart=0;        // xforms scope designed to display nb_UEs signals 
 #endif 
+
+  NR_DL_FRAME_PARMS *frame_parms=&p->gNB->frame_parms;
+  int num_re = frame_parms->N_RB_UL*12*frame_parms->symbols_per_slot;
+  int Qm = 2;
+  int coded_bits_per_codeword = num_re*Qm;
+
   for (int ue=uestart; ue<nb_UEs; ue++) {
     if ( p->gNB->pusch_vars &&
          p->gNB->pusch_vars[ue] &&
@@ -786,7 +792,7 @@ static void ueFreqWaterFall (scopeGraphData_t **data, OAIgraph_t *graph,PHY_VARS
   NR_DL_FRAME_PARMS *frame_parms=&phy_vars_ue->frame_parms;
   //use 1st antenna
   genericWaterFall(graph,
-                   (scopeSample_t *)phy_vars_ue->common_vars.common_vars_rx_data_per_thread[0].rxdataF[0],
+                   (scopeSample_t *)phy_vars_ue->common_vars.rxdataF[0],
                    frame_parms->samples_per_slot_wCP,
                    phy_vars_ue->frame_parms.slots_per_frame,
                    "X axis: one frame frequency" );
@@ -927,7 +933,7 @@ static void uePcchIQ  (scopeGraphData_t **data, OAIgraph_t *graph, PHY_VARS_NR_U
 
 static void uePdschLLR  (scopeGraphData_t **data, OAIgraph_t *graph, PHY_VARS_NR_UE *phy_vars_ue, int eNB_id, int UE_id) {
   // PDSCH LLRs
-  if (!phy_vars_ue->pdsch_vars[0][eNB_id]->llr[0])
+  if (!phy_vars_ue->pdsch_vars[eNB_id]->llr[0])
     return;
 
   int num_re = 4500;
@@ -942,7 +948,7 @@ static void uePdschLLR  (scopeGraphData_t **data, OAIgraph_t *graph, PHY_VARS_NR
   int base=0;
 
   for (int thr=0 ; thr < RX_NB_TH_MAX ; thr ++ ) {
-    int16_t *pdsch_llr = (int16_t *) phy_vars_ue->pdsch_vars[thr][eNB_id]->llr[0]; // stream 0
+    int16_t *pdsch_llr = (int16_t *) phy_vars_ue->pdsch_vars[eNB_id]->llr[0]; // stream 0
 #ifdef WEBSRVSCOPE
       newsz +=  websrv_cpllrbuff_tomsg(graph, pdsch_llr,coded_bits_per_codeword, 0,thr,RX_NB_TH_MAX);
 #else  
@@ -961,7 +967,7 @@ static void uePdschLLR  (scopeGraphData_t **data, OAIgraph_t *graph, PHY_VARS_NR
 }
 static void uePdschIQ  (scopeGraphData_t **data, OAIgraph_t *graph, PHY_VARS_NR_UE *phy_vars_ue, int eNB_id, int UE_id) {
   // PDSCH I/Q of MF Output
-  if (!phy_vars_ue->pdsch_vars[0][eNB_id]->rxdataF_comp0[0])
+  if (!phy_vars_ue->pdsch_vars[eNB_id]->rxdataF_comp0[0])
     return;
 
   NR_DL_FRAME_PARMS *frame_parms = &phy_vars_ue->frame_parms;
@@ -976,7 +982,7 @@ static void uePdschIQ  (scopeGraphData_t **data, OAIgraph_t *graph, PHY_VARS_NR_
   memset(Q+base, 0, sz*RX_NB_TH_MAX * sizeof(*Q));
 #endif
   for (int thr=0 ; thr < RX_NB_TH_MAX ; thr ++ ) {
-    scopeSample_t *pdsch_comp = (scopeSample_t *) phy_vars_ue->pdsch_vars[thr][eNB_id]->rxdataF_comp0[0];
+    scopeSample_t *pdsch_comp = (scopeSample_t *) phy_vars_ue->pdsch_vars[eNB_id]->rxdataF_comp0[0];
 #ifdef WEBSRVSCOPE
     newsz += websrv_cpiqbuff_tomsg(graph, pdsch_comp,sz, 0,base);
 #else 

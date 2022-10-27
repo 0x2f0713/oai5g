@@ -42,6 +42,7 @@
 #include "PHY/defs_common.h"
 #include "PHY/CODING/nrLDPC_extern.h"
 #include "PHY/CODING/nrLDPC_decoder/nrLDPC_types.h"
+#include "executables/rt_profiling.h"
 
 #include "nfapi_nr_interface_scf.h"
 
@@ -188,8 +189,6 @@ typedef struct {
   uint8_t codebook_index;
   /// Maximum number of HARQ processes
   uint8_t Mdlharq;
-  /// Maximum number of HARQ rounds
-  uint8_t Mlimit;
   /// MIMO transmission mode indicator for this sub-frame
   uint8_t Kmimo;
   /// Nsoft parameter related to UE Category
@@ -225,6 +224,11 @@ typedef struct {
   int32_t *prach_ifft;
   gNB_PRACH_list_t list[NUMBER_OF_NR_PRACH_MAX];
 } NR_gNB_PRACH;
+
+typedef struct {
+  uint8_t NumPRSResources;
+  prs_config_t prs_cfg[NR_MAX_PRS_RESOURCES_PER_SET];
+} NR_gNB_PRS;
 
 typedef struct {
   /// Nfapi ULSCH PDU
@@ -338,6 +342,9 @@ typedef struct {
   int16_t q_RI[MAX_RI_PAYLOAD];
   /// Temporary h sequence to flag PUSCH_x/PUSCH_y symbols which are not scrambled
   uint8_t h[MAX_NUM_CHANNEL_BITS];
+  /// Last index of LLR buffer that contains information.
+  /// Used for computing LDPC decoder R
+  int llrLen;
   //////////////////////////////////////////////////////////////
 } NR_UL_gNB_HARQ_t;
 
@@ -345,8 +352,6 @@ typedef struct {
 typedef struct {
   /// Pointers to 16 HARQ processes for the ULSCH
   NR_UL_gNB_HARQ_t *harq_processes[NR_MAX_ULSCH_HARQ_PROCESSES];
-  /// Current HARQ process id
-  int harq_process_id[NR_MAX_SLOTS_PER_FRAME];
   /// HARQ process mask, indicates which processes are currently active
   uint16_t harq_mask;
   /// ACK/NAK Bundling flag
@@ -373,8 +378,6 @@ typedef struct {
   uint8_t cyclicShift;
   /// for cooperative communication
   uint8_t cooperation_flag;
-  /// Maximum number of HARQ rounds
-  uint8_t Mlimit;
   /// Maximum number of LDPC iterations
   uint8_t max_ldpc_iterations;
   /// number of iterations used in last LDPC decoding
@@ -402,10 +405,6 @@ typedef struct {
 } NR_gNB_SRS_t;
 
 typedef struct {
-  /// \brief Pointers (dynamic) to the received data in the time domain.
-  /// - first index: rx antenna [0..nb_antennas_rx[
-  /// - second index: ? [0..2*ofdm_symbol_size*frame_parms->symbols_per_tti[
-  int32_t **rxdata;
   /// \brief Pointers (dynamic) to the received data in the frequency domain.
   /// - first index: rx antenna [0..nb_antennas_rx[
   /// - second index: ? [0..2*ofdm_symbol_size*frame_parms->symbols_per_tti[
@@ -746,6 +745,7 @@ typedef struct PHY_VARS_gNB_s {
   NR_gNB_PBCH        pbch;
   NR_gNB_COMMON      common_vars;
   NR_gNB_PRACH       prach_vars;
+  NR_gNB_PRS         prs_vars;
   NR_gNB_PUSCH       *pusch_vars[NUMBER_OF_NR_ULSCH_MAX];
   NR_gNB_PUCCH_t     *pucch[NUMBER_OF_NR_PUCCH_MAX];
   NR_gNB_SRS_t       *srs[NUMBER_OF_NR_SRS_MAX];
@@ -765,8 +765,8 @@ typedef struct PHY_VARS_gNB_s {
   /// SRS variables
   nr_srs_info_t *nr_srs_info[NUMBER_OF_NR_SRS_MAX];
 
-  /// CSI-RS variables
-  nr_csi_rs_info_t *nr_csi_rs_info;
+  /// CSI variables
+  nr_csi_info_t *nr_csi_info;
 
   uint8_t pbch_configured;
   char gNB_generate_rar;
@@ -799,6 +799,9 @@ typedef struct PHY_VARS_gNB_s {
   // Mask of occupied RBs, per symbol and PRB
   uint32_t rb_mask_ul[14][9];
 
+  /// PRS sequence
+  uint32_t ****nr_gold_prs;
+
   /// Indicator set to 0 after first SR
   uint8_t first_sr[NUMBER_OF_NR_SR_MAX];
 
@@ -817,7 +820,7 @@ typedef struct PHY_VARS_gNB_s {
   double N0;
 
   unsigned char first_run_I0_measurements;
-
+  int ldpc_offload_flag;
 
   unsigned char    is_secondary_gNB; // primary by default
   unsigned char    is_init_sync;     /// Flag to tell if initial synchronization is performed. This affects how often the secondary eNB will listen to the PSS from the primary system.
@@ -850,6 +853,7 @@ typedef struct PHY_VARS_gNB_s {
   int pucch0_thres;
   int pusch_thres;
   int prach_thres;
+  int srs_thres;
   uint64_t bad_pucch;
   int num_ulprbbl;
   int ulprbbl[275];
@@ -896,18 +900,19 @@ typedef struct PHY_VARS_gNB_s {
   time_stats_t rx_dft_stats;
   time_stats_t ulsch_freq_offset_estimation_stats;
   */
-  notifiedFIFO_t *respDecode;
-  notifiedFIFO_t *resp_L1;
-  notifiedFIFO_t *L1_tx_free;
-  notifiedFIFO_t *L1_tx_filled;
-  notifiedFIFO_t *L1_tx_out;
-  notifiedFIFO_t *resp_RU_tx;
-  tpool_t *threadPool;
+  notifiedFIFO_t respDecode;
+  notifiedFIFO_t resp_L1;
+  notifiedFIFO_t L1_tx_free;
+  notifiedFIFO_t L1_tx_filled;
+  notifiedFIFO_t L1_tx_out;
+  notifiedFIFO_t resp_RU_tx;
+  tpool_t threadPool;
   int nbDecode;
-  uint8_t thread_pool_size;
   int number_of_nr_dlsch_max;
   int number_of_nr_ulsch_max;
   void * scopeData;
+  /// structure for analyzing high-level RT measurements
+  rt_L1_profiling_t rt_L1_profiling; 
 } PHY_VARS_gNB;
 
 typedef struct LDPCDecode_s {

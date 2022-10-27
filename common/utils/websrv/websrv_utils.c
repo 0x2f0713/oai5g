@@ -32,6 +32,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
+#include <stdbool.h>
 #include "common/utils/LOG/log.h"
 #include <libgen.h>
 #include <jansson.h>
@@ -45,6 +46,7 @@ typedef struct {
   char *buff;                     // a buffer to store the message, allocated in websrv_printf_start, free in websrv_print_end
   int  buffsize;                  //
   char *buffptr;                  // pointer to free portion of buff
+  bool  async;                    // the buffer will be used to print from another thread than the callback (command pushed in a tpool queue)
 } websrv_printf_t;
 static websrv_printf_t websrv_printf_buff; 
 /*--------------------- functions for help ------------------------*/
@@ -152,12 +154,13 @@ int websrv_string_response(char *astring, struct _u_response * response, int htt
 }
 /*----------------------------------------------------------------------------------*/
 /* set of calls to fill a buffer with a string and  use this buffer in a response */
-void websrv_printf_start(struct _u_response * response, int buffsize ) {
+void websrv_printf_start(struct _u_response * response, int buffsize, bool async ) {
   pthread_mutex_lock(&(websrv_printf_buff.mutex));	
   websrv_printf_buff.buff = malloc(buffsize);
   websrv_printf_buff.buffptr = websrv_printf_buff.buff;
   websrv_printf_buff.buffsize = buffsize;
   websrv_printf_buff.response = response;
+  websrv_printf_buff.async = async;
 }
 
 void websrv_printf_atpos( int pos, const char *message,  ...) {
@@ -181,6 +184,14 @@ void websrv_printf( const char *message,  ...) {
 }
 
 void websrv_printf_end(int httpstatus,int dbglvl ) {
+  int count=0;
+  while ( __atomic_load_n (&(websrv_printf_buff.async),__ATOMIC_SEQ_CST)) {
+	usleep(10);
+	if (count == 99) {
+		websrv_printf("No response from server...");
+		break;
+	}
+  }
   if (httpstatus >= 200 && httpstatus < 300) {
     LOG_I(UTIL,"[websrv] %s\n",websrv_printf_buff.buff);
     websrv_string_response(websrv_printf_buff.buff, websrv_printf_buff.response, httpstatus,dbglvl) ;   
@@ -191,8 +202,24 @@ void websrv_printf_end(int httpstatus,int dbglvl ) {
   
   free(websrv_printf_buff.buff);
   websrv_printf_buff.buff=NULL;
+  websrv_printf_buff.async=false;
   pthread_mutex_unlock(&(websrv_printf_buff.mutex));
 
+}
+
+void websrv_async_printf( const char *message,  ...) {
+  if( __atomic_load_n (&(websrv_printf_buff.async),__ATOMIC_SEQ_CST)) {
+    va_list va_args;
+    va_start(va_args, message);
+    websrv_printf_buff.buffptr +=  vsnprintf( websrv_printf_buff.buff,
+                                              websrv_printf_buff.buffsize - 1,message, va_args );	
+  
+    va_end(va_args);
+  __atomic_store_n(&(websrv_printf_buff.async),0,__ATOMIC_SEQ_CST);
+  } else {
+	  LOG_W(UTIL,"[websrv], delayed  websrv_async_printf skipped\n");
+  }
+  return ;
 }
 /* */
 /*----------------------------------------------------------------------------------------------------------*/

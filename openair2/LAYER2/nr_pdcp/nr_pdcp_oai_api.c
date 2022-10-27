@@ -37,6 +37,7 @@
 #include "LAYER2/nr_rlc/nr_rlc_oai_api.h"
 #include <openair3/ocp-gtpu/gtp_itf.h>
 #include "openair2/SDAP/nr_sdap/nr_sdap.h"
+#include "executables/softmodem-common.h"
 
 #define TODO do { \
     printf("%s:%d:%s: todo\n", __FILE__, __LINE__, __FUNCTION__); \
@@ -265,7 +266,7 @@ static void do_pdcp_data_ind(
     else
       rb = ue->srb[rb_id - 1];
   } else {
-    if (rb_id < 1 || rb_id > 5)
+    if (rb_id < 1 || rb_id > MAX_DRBS_PER_UE)
       rb = NULL;
     else
       rb = ue->drb[rb_id - 1];
@@ -484,12 +485,12 @@ static void *ue_tun_read_thread(void *_)
     ctxt.rnti = rnti;
 
     bool dc = SDAP_HDR_UL_DATA_PDU;
-    uint8_t qfi = 7;
-    int pdusession_id = 10;
+    extern uint8_t nas_qfi;
+    extern uint8_t nas_pduid;
 
     sdap_data_req(&ctxt, SRB_FLAG_NO, rb_id, RLC_MUI_UNDEFINED,
                   RLC_SDU_CONFIRM_NO, len, (unsigned char *)rx_buf,
-                  PDCP_TRANSMISSION_MODE_DATA, NULL, NULL, qfi, dc, pdusession_id);
+                  PDCP_TRANSMISSION_MODE_DATA, NULL, NULL, nas_qfi, dc, nas_pduid);
   }
 
   return NULL;
@@ -591,8 +592,10 @@ uint64_t nr_pdcp_module_init(uint64_t _pdcp_optmask, int id)
       int num_if = (NFAPI_MODE == NFAPI_UE_STUB_PNF || IS_SOFTMODEM_SIML1 || NFAPI_MODE == NFAPI_MODE_STANDALONE_PNF)? MAX_MOBILES_PER_ENB : 1;
       netlink_init_tun(ifsuffix_ue, num_if, id);
       //Add --nr-ip-over-lte option check for next line
-      if (IS_SOFTMODEM_NOS1)
-          nas_config(1, 1, !get_softmodem_params()->nsa ? 2 : 3, ifsuffix_ue);
+      if (IS_SOFTMODEM_NOS1){
+        nas_config(1, 1, !get_softmodem_params()->nsa ? 2 : 3, ifsuffix_ue);
+        set_qfi_pduid(7, 10);
+      }
       LOG_I(PDCP, "UE pdcp will use tun interface\n");
       start_pdcp_tun_ue();
     } else if(ENB_NAS_USE_TUN) {
@@ -629,7 +632,7 @@ static void deliver_sdu_drb(void *_ue, nr_pdcp_entity_t *entity,
                   size);
   }
   else{
-    for (i = 0; i < 5; i++) {
+    for (i = 0; i < MAX_DRBS_PER_UE; i++) {
         if (entity == ue->drb[i]) {
           rb_id = i+1;
           goto rb_found;
@@ -664,7 +667,7 @@ static void deliver_pdu_drb(void *_ue, nr_pdcp_entity_t *entity,
   int i;
   mem_block_t *memblock;
 
-  for (i = 0; i < 5; i++) {
+  for (i = 0; i < MAX_DRBS_PER_UE; i++) {
     if (entity == ue->drb[i]) {
       rb_id = i+1;
       goto rb_found;
@@ -709,7 +712,7 @@ rb_found:
     
     memblock = get_free_mem_block(size, __FUNCTION__);
     memcpy(memblock->data, buf, size);
-    LOG_D(PDCP, "%s(): (srb %d) calling rlc_data_req size %d\n", __func__, rb_id, size);
+    LOG_D(PDCP, "%s(): (drb %d) calling rlc_data_req size %d\n", __func__, rb_id, size);
     //for (i = 0; i < size; i++) printf(" %2.2x", (unsigned char)memblock->data[i]);
     //printf("\n");
     enqueue_rlc_data_req(&ctxt, 0, MBMS_FLAG_NO, rb_id, sdu_id, 0, size, memblock);
@@ -734,27 +737,30 @@ static void deliver_sdu_srb(void *_ue, nr_pdcp_entity_t *entity,
 	__FILE__, __LINE__, __FUNCTION__, ue->rnti);
   exit(1);
 
- srb_found:
-  {
-       uint8_t *rrc_buffer_p = entity->is_gnb ?
-					itti_malloc(TASK_PDCP_ENB, TASK_RRC_GNB, size):
-                                        itti_malloc(TASK_PDCP_UE, TASK_RRC_NRUE, size);
-       MessageDef  *message_p;
-
-       AssertFatal(rrc_buffer_p != NULL, "OUT OF MEMORY");
-       memcpy(rrc_buffer_p, buf, size);
-       message_p = entity->is_gnb ?
-                            itti_alloc_new_message(TASK_PDCP_ENB, 0, NR_RRC_DCCH_DATA_IND):
-                            itti_alloc_new_message(TASK_PDCP_UE, 0, NR_RRC_DCCH_DATA_IND);
-
-       AssertFatal(message_p != NULL, "OUT OF MEMORY");
-       NR_RRC_DCCH_DATA_IND(message_p).dcch_index = srb_id;
-       NR_RRC_DCCH_DATA_IND(message_p).sdu_p = rrc_buffer_p;
-       NR_RRC_DCCH_DATA_IND(message_p).sdu_size = size;
-       NR_RRC_DCCH_DATA_IND(message_p).rnti = ue->rnti;
-
-       itti_send_msg_to_task(entity->is_gnb ? TASK_RRC_GNB : TASK_RRC_NRUE, 0, message_p);
-    }
+srb_found:
+  if (entity->is_gnb) {
+    MessageDef *message_p = itti_alloc_new_message(TASK_PDCP_GNB, 0, F1AP_UL_RRC_MESSAGE);
+    AssertFatal(message_p != NULL, "OUT OF MEMORY\n");
+    f1ap_ul_rrc_message_t *ul_rrc = &F1AP_UL_RRC_MESSAGE(message_p);
+    ul_rrc->rnti = ue->rnti;
+    ul_rrc->srb_id = srb_id;
+    ul_rrc->rrc_container = malloc(size);
+    AssertFatal(ul_rrc->rrc_container != NULL, "OUT OF MEMORY\n");
+    memcpy(ul_rrc->rrc_container, buf, size);
+    ul_rrc->rrc_container_length = size;
+    itti_send_msg_to_task(TASK_RRC_GNB, 0, message_p);
+  } else {
+    uint8_t *rrc_buffer_p = itti_malloc(TASK_PDCP_UE, TASK_RRC_NRUE, size);
+    AssertFatal(rrc_buffer_p != NULL, "OUT OF MEMORY\n");
+    memcpy(rrc_buffer_p, buf, size);
+    MessageDef *message_p = itti_alloc_new_message(TASK_PDCP_UE, 0, NR_RRC_DCCH_DATA_IND);
+    AssertFatal(message_p != NULL, "OUT OF MEMORY\n");
+    NR_RRC_DCCH_DATA_IND(message_p).dcch_index = srb_id;
+    NR_RRC_DCCH_DATA_IND(message_p).sdu_p = rrc_buffer_p;
+    NR_RRC_DCCH_DATA_IND(message_p).sdu_size = size;
+    NR_RRC_DCCH_DATA_IND(message_p).rnti = ue->rnti;
+    itti_send_msg_to_task(TASK_RRC_NRUE, 0, message_p);
+  }
 }
 
 static void deliver_pdu_srb(void *_ue, nr_pdcp_entity_t *entity,
@@ -994,14 +1000,14 @@ static void add_drb_am(int is_gnb, int rnti, struct NR_DRB_ToAddMod *s,
 
     LOG_D(PDCP, "%s:%d:%s: added drb %d to ue rnti %x\n", __FILE__, __LINE__, __FUNCTION__, drb_id, rnti);
 
-    new_nr_sdap_entity(has_sdap,
+    new_nr_sdap_entity(is_gnb,
+                       has_sdap,
                        rnti,
                        pdusession_id,
                        is_sdap_DefaultDRB,
                        drb_id,
                        mappedQFIs2Add,
                        mappedQFIs2AddCount);
-    LOG_D(SDAP, "Added SDAP entity to ue rnti %x with pdusession_id %d\n", rnti, pdusession_id);
   }
   nr_pdcp_manager_unlock(nr_pdcp_ue_manager);
 }
@@ -1262,6 +1268,7 @@ void pdcp_config_set_security(
     ciphering_algorithm = security_modeP & 0x0f;
     rb->set_security(rb, integrity_algorithm, (char *)kRRCint_pP,
                      ciphering_algorithm, (char *)kRRCenc_pP);
+    rb->security_mode_completed = false;
   } else {
     LOG_E(PDCP, "%s:%d:%s: TODO\n", __FILE__, __LINE__, __FUNCTION__);
     exit(1);
@@ -1342,7 +1349,7 @@ static bool pdcp_data_req_drb(protocol_ctxt_t  *ctxt_pP,
 
   ue = nr_pdcp_manager_get_ue(nr_pdcp_ue_manager, rnti);
 
-  if (rb_id < 1 || rb_id > 5)
+  if (rb_id < 1 || rb_id > MAX_DRBS_PER_UE)
     rb = NULL;
   else
     rb = ue->drb[rb_id - 1];
@@ -1436,6 +1443,44 @@ void nr_pdcp_tick(int frame, int subframe)
 /*
  * For the SDAP API
  */
-nr_pdcp_ue_manager_t *nr_pdcp_sdap_get_ue_manager(){
-    return nr_pdcp_ue_manager;
+nr_pdcp_ue_manager_t *nr_pdcp_sdap_get_ue_manager() {
+  return nr_pdcp_ue_manager;
+}
+
+/* returns false in case of error, true if everything ok */
+const bool nr_pdcp_get_statistics(
+  int rnti,
+  int srb_flag,
+  int rb_id,
+  nr_pdcp_statistics_t *out)
+{
+  nr_pdcp_ue_t     *ue;
+  nr_pdcp_entity_t *rb;
+  bool             ret;
+
+  nr_pdcp_manager_lock(nr_pdcp_ue_manager);
+  ue = nr_pdcp_manager_get_ue(nr_pdcp_ue_manager, rnti);
+
+  if (srb_flag == 1) {
+    if (rb_id < 1 || rb_id > 2)
+      rb = NULL;
+    else
+      rb = ue->srb[rb_id - 1];
+  } else {
+    if (rb_id < 1 || rb_id > 5)
+      rb = NULL;
+    else
+      rb = ue->drb[rb_id - 1];
+  }
+
+  if (rb != NULL) {
+    rb->get_stats(rb, out);
+    ret = true;
+  } else {
+    ret = false;
+  }
+
+  nr_pdcp_manager_unlock(nr_pdcp_ue_manager);
+
+  return ret;
 }

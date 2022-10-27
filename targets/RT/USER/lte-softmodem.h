@@ -19,8 +19,7 @@
 #include <sys/sysinfo.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include "threads_t.h"
-#include "../../ARCH/COMMON/common_lib.h"
+#include "radio/COMMON/common_lib.h"
 //#undef MALLOC
 #include "assertions.h"
 #include "PHY/types.h"
@@ -75,7 +74,7 @@
 #define CONFIG_HLP_PRB           "Set the PRB, valid values: 6, 25, 50, 100  \n"
 #define CONFIG_HLP_DLSHIFT       "dynamic shift for LLR compuation for TM3/4 (default 0)\n"
 #define CONFIG_HLP_USRP_ARGS     "set the arguments to identify USRP (same syntax as in UHD)\n"
-#define CONFIG_HLP_DMAMAP        "sets flag for improved EXMIMO UE performance\n"
+#define CONFIG_HLP_DMAMAP        "use DMA memory mapping\n"
 #define CONFIG_HLP_TDD           "Set hardware to TDD mode (default: FDD). Used only with -U (otherwise set in config file).\n"
 #define CONFIG_HLP_TADV          "Set timing_advance\n"
 
@@ -106,7 +105,7 @@
     {"nums_ue_thread",    NULL,                   0,               u16ptr:&(NB_THREAD_INST),           defuintval:1,         TYPE_UINT16,   0},   \
     {"r"  ,               CONFIG_HLP_PRB,         0,               u8ptr:&(frame_parms[0]->N_RB_DL),   defintval:25,         TYPE_UINT8,    0},   \
     {"dlsch-demod-shift", CONFIG_HLP_DLSHIFT,     0,               iptr:(int32_t *)&dlsch_demod_shift, defintval:0,          TYPE_INT,      0},   \
-    {"usrp-args",         CONFIG_HLP_USRP_ARGS,   0,               strptr:(char **)&usrp_args,         defstrval:"type=b200",TYPE_STRING,   0},   \
+    {"usrp-args",         CONFIG_HLP_USRP_ARGS,   0,               strptr:&usrp_args,         defstrval:"type=b200",TYPE_STRING,   0},   \
     {"mmapped-dma",       CONFIG_HLP_DMAMAP,      PARAMFLAG_BOOL,  uptr:&mmapped_dma,                  defintval:0,          TYPE_INT,      0},   \
     {"T" ,                CONFIG_HLP_TDD,         PARAMFLAG_BOOL,  iptr:&tddflag,                      defintval:0,          TYPE_INT,      0},   \
     {"A",                 CONFIG_HLP_TADV,        0,               iptr:&(timingadv),                  defintval:0,          TYPE_INT,      0},   \
@@ -117,15 +116,6 @@
 /*-----------------------------------------------------------------------------------------------------------------------------*/
 /*                                            command line parameters specific to UE threads                                   */
 /*   optname                   helpstr     paramflags     XXXptr                       defXXXval        type          numelt   */
-/*-----------------------------------------------------------------------------------------------------------------------------*/
-#define CMDLINE_UETHREADSPARAMS_DESC {  \
-    {"threadOneSubframe",       NULL,      0,     iptr:&(threads.one),                defintval:1,     TYPE_INT,       0},   \
-    {"threadTwoSubframe",       NULL,      0,     iptr:&(threads.two),                defintval:1,     TYPE_INT,       0},   \
-    {"threadThreeSubframe",     NULL,      0,     iptr:&(threads.three),              defintval:1,     TYPE_INT,       0},   \
-    {"threadSlot1ProcOne",      NULL,      0,     iptr:&(threads.slot1_proc_one),     defintval:1,     TYPE_INT,       0},   \
-    {"threadSlot1ProcTwo",      NULL,      0,     iptr:&(threads.slot1_proc_two),     defintval:1,     TYPE_INT,       0},   \
-  }
-//    {"threadIQ",                NULL,      0,     iptr:&(threads.iq),                 defintval:1,     TYPE_INT,       0},
 
 #define DEFAULT_DLF 2680000000
 
@@ -145,7 +135,7 @@ extern int rx_input_level_dBm;
 extern uint64_t num_missed_slots; // counter for the number of missed slots
 
 extern int oaisim_flag;
-extern volatile int oai_exit;
+extern int oai_exit;
 
 extern openair0_config_t openair0_cfg[MAX_CARDS];
 extern pthread_cond_t sync_cond;
@@ -213,5 +203,19 @@ extern void init_UE_standalone_thread(int ue_idx);
 extern PHY_VARS_UE *init_ue_vars(LTE_DL_FRAME_PARMS *frame_parms, uint8_t UE_id, uint8_t abstraction_flag);
 
 extern void init_bler_table(void);
-
+void feptx_ofdm_2thread(RU_t *ru,
+                        int frame,
+                        int subframe);
+void* ru_thread_control( void* param );
+void wait_eNBs(void);
+void kill_feptx_thread(RU_t *ru);
+void init_fep_thread(RU_t *ru, pthread_attr_t *attr_fep);
+void init_feptx_thread(RU_t *ru, pthread_attr_t *attr_feptx);
+void fep_full(RU_t *ru, int subframe);
+void configure_ru(int, void *arg);
+void configure_rru(int, void *arg);
+void ru_fep_full_2thread(RU_t *ru,int subframe);
+void feptx_ofdm(RU_t*ru, int frame_tx, int tti_tx);
+void feptx_prec(struct RU_t_s *ru, int frame_tx, int tti_tx);
+void fill_rf_config(RU_t *ru, char *rf_config_file);
 #endif

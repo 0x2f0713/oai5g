@@ -25,7 +25,7 @@ export class HelpApi {
     public getHelp$ = (req : HelpRequest) => this.httpClient.get<HelpResp>(environment.backend + hlproute + req.module + "_" + req.command + "_" +req.object + ".html",{observe: 'response'});
 
     public getHelpText(module:string, command:string, object:string): Observable<string>{
-		  return this.getHelp$({module:module, command:command,object:object}).pipe( map (
+		  return this.getHelp$({module:module, command:command.replace(" ","_"),object:object.replace(" ","_")}).pipe( map (
                 (response => {return (response.status == 201)?response.body!.text:"";}),
 	   ) ); //pipe
 		   

@@ -226,10 +226,11 @@ void nr_modulation(uint32_t *in,
     i *= 24;
     bit_cnt = i * 8;
     while (bit_cnt < length) {
-      x = *((uint32_t*)(in_bytes+i));
-      x1 = x&4095;
+      uint32_t xx;
+      memcpy(&xx, in_bytes+i, sizeof(xx));
+      x1 = xx & 4095;
       out64[j++] = nr_64qam_mod_table[x1];
-      x1 = (x>>12)&4095;
+      x1 = (xx >> 12) & 4095;
       out64[j++] = nr_64qam_mod_table[x1];
       i += 3;
       bit_cnt += 24;
@@ -250,7 +251,7 @@ void nr_modulation(uint32_t *in,
 
 void nr_layer_mapping(int16_t **mod_symbs,
                       uint8_t n_layers,
-                      uint16_t n_symbs,
+                      uint32_t n_symbs,
                       int16_t **tx_layers)
 {
   LOG_D(PHY,"Doing layer mapping for %d layers, %d symbols\n",n_layers,n_symbs);
@@ -322,7 +323,7 @@ void nr_layer_mapping(int16_t **mod_symbs,
 
 void nr_ue_layer_mapping(int16_t *mod_symbs,
                          uint8_t n_layers,
-                         uint16_t n_symbs,
+                         uint32_t n_symbs,
                          int16_t **tx_layers) {
 
   for (int i=0; i<n_symbs/n_layers; i++) {
@@ -338,7 +339,7 @@ void nr_dft(int32_t *z, int32_t *d, uint32_t Msc_PUSCH)
 {
 #if defined(__x86_64__) || +defined(__i386__)
   __m128i dft_in128[1][3240], dft_out128[1][3240];
-#elif defined(__arm__)
+#elif defined(__arm__) || defined(__aarch64__)
   int16x8_t dft_in128[1][3240], dft_out128[1][3240];
 #endif
   uint32_t *dft_in0 = (uint32_t*)dft_in128[0], *dft_out0 = (uint32_t*)dft_out128[0];
@@ -347,7 +348,7 @@ void nr_dft(int32_t *z, int32_t *d, uint32_t Msc_PUSCH)
 
 #if defined(__x86_64__) || defined(__i386__)
   __m128i norm128;
-#elif defined(__arm__)
+#elif defined(__arm__) || defined(__aarch64__)
   int16x8_t norm128;
 #endif
 
@@ -363,13 +364,13 @@ void nr_dft(int32_t *z, int32_t *d, uint32_t Msc_PUSCH)
 
 #if defined(__x86_64__) || defined(__i386__)
       norm128 = _mm_set1_epi16(9459);
-#elif defined(__arm__)
+#elif defined(__arm__) || defined(__aarch64__)
       norm128 = vdupq_n_s16(9459);
 #endif
       for (i=0; i<12; i++) {
 #if defined(__x86_64__) || defined(__i386__)
         ((__m128i*)dft_out0)[i] = _mm_slli_epi16(_mm_mulhi_epi16(((__m128i*)dft_out0)[i], norm128), 1);
-#elif defined(__arm__)
+#elif defined(__arm__) || defined(__aarch64__)
         ((int16x8_t*)dft_out0)[i] = vqdmulhq_s16(((int16x8_t*)dft_out0)[i], norm128);
 #endif
       }
@@ -617,32 +618,23 @@ void init_symbol_rotation(NR_DL_FRAME_PARMS *fp) {
   for (uint8_t ll = 0; ll < 2; ll++){
 
     double f0 = f[ll];
-    double Ncpm1 = Ncp0;
+    LOG_I(PHY, "Doing symbol rotation calculation for gNB TX/RX, f0 %f Hz, Nsymb %d\n", f0, nsymb);
     c16_t *symbol_rotation = fp->symbol_rotation[ll];
 
-    double tl = 0;
-    double poff = 2 * M_PI * ((Ncp0 * Tc)) * f0;
-    double exp_re = cos(poff);
-    double exp_im = sin(-poff);
-    symbol_rotation[0].r = (int16_t)floor(exp_re * 32767);
-    symbol_rotation[0].i = (int16_t)floor(exp_im * 32767);
-    LOG_I(PHY, "Doing symbol rotation calculation for gNB TX/RX, f0 %f Hz, Nsymb %d\n", f0, nsymb);
-    LOG_I(PHY, "Symbol rotation %d/%d => (%d,%d)\n",
-      0,
-      nsymb,
-      symbol_rotation[0].r,
-      symbol_rotation[0].i);
+    double tl = 0.0;
+    double poff = 0.0;
+    double exp_re = 0.0;
+    double exp_im = 0.0;
 
-    for (int l = 1; l < nsymb; l++) {
+    for (int l = 0; l < nsymb; l++) {
 
       double Ncp;
-      if (l == (7 * (1 << fp->numerology_index))) {
+      if (l == 0 || l == (7 * (1 << fp->numerology_index))) {
         Ncp = Ncp0;
       } else {
         Ncp = Ncp1;
       }
 
-      tl += (Nu + Ncpm1) * Tc;
       poff = 2 * M_PI * (tl + (Ncp * Tc)) * f0;
       exp_re = cos(poff);
       exp_im = sin(-poff);
@@ -657,7 +649,7 @@ void init_symbol_rotation(NR_DL_FRAME_PARMS *fp) {
         symbol_rotation[l].i,
         (poff / 2 / M_PI) - floor(poff / 2 / M_PI));
 
-      Ncpm1 = Ncp;
+      tl += (Nu + Ncp) * Tc;
 
     }
   }

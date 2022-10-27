@@ -36,18 +36,46 @@
 #include "NR_CellGroupConfig.h"
 #include "nr_mac.h"
 #include "openair1/PHY/impl_defs_nr.h"
+#include "common/utils/nr/nr_common.h"
+
+typedef enum {
+  pusch_dmrs_pos0 = 0,
+  pusch_dmrs_pos1 = 1,
+  pusch_dmrs_pos2 = 2,
+  pusch_dmrs_pos3 = 3,
+} pusch_dmrs_AdditionalPosition_t;
+
+typedef enum {
+  typeA = 0,
+  typeB = 1
+} mappingType_t;
 
 uint32_t get_Y(NR_SearchSpace_t *ss, int slot, rnti_t rnti);
+
+uint8_t get_BG(uint32_t A, uint16_t R);
 
 uint64_t from_nrarfcn(int nr_bandP, uint8_t scs_index, uint32_t dl_nrarfcn);
 
 uint32_t to_nrarfcn(int nr_bandP, uint64_t dl_CarrierFreq, uint8_t scs_index, uint32_t bw);
 
-int16_t fill_dmrs_mask(NR_PDSCH_Config_t *pdsch_Config,int dmrs_TypeA_Position,int NrOfSymbols,int startSymbol,int mappingtype_fromDCI,int length);
+int16_t fill_dmrs_mask(const NR_PDSCH_Config_t *pdsch_Config,int dmrs_TypeA_Position,int NrOfSymbols,int startSymbol,mappingType_t mappingtype,int length);
 
 int is_nr_DL_slot(NR_TDD_UL_DL_ConfigCommon_t *tdd_UL_DL_ConfigurationCommon,slot_t slotP);
 
 int is_nr_UL_slot(NR_TDD_UL_DL_ConfigCommon_t *tdd_UL_DL_ConfigurationCommon, slot_t slotP, frame_type_t frame_type);
+
+uint8_t compute_srs_resource_indicator(NR_PUSCH_ServingCellConfig_t *pusch_servingcellconfig,
+                                       NR_PUSCH_Config_t *pusch_Config,
+                                       NR_SRS_Config_t *srs_config,
+                                       nr_srs_feedback_t *srs_feedback,
+                                       uint16_t *val);
+
+uint8_t compute_precoding_information(NR_PUSCH_Config_t *pusch_Config,
+                                      NR_SRS_Config_t *srs_config,
+                                      dci_field_t srs_resource_indicator,
+                                      nr_srs_feedback_t *srs_feedback,
+                                      const uint8_t *nrOfLayers,
+                                      uint16_t *val);
 
 uint16_t nr_dci_size(const NR_BWP_DownlinkCommon_t *initialDLBWP,
                      const NR_BWP_UplinkCommon_t *initialULBWP,
@@ -105,7 +133,7 @@ uint8_t get_pusch_mcs_table(long *mcs_Table,
 uint8_t compute_nr_root_seq(NR_RACH_ConfigCommon_t *rach_config,
                             uint8_t nb_preambles,
                             uint8_t unpaired,
-			    frequency_range_t);
+                            frequency_range_t);
 
 int ul_ant_bits(NR_DMRS_UplinkConfig_t *NR_DMRS_UplinkConfig,long transformPrecoder);
 
@@ -142,8 +170,11 @@ uint32_t nr_get_code_rate_ul(uint8_t Imcs, uint8_t table_idx);
 
 uint16_t get_nr_srs_offset(NR_SRS_PeriodicityAndOffset_t periodicityAndOffset);
 
-int get_bw_tbslbrm(NR_BWP_t *genericParameters,
-                   NR_CellGroupConfig_t *cg);
+int get_dlbw_tbslbrm(int scc_bwpsize,
+                     NR_CellGroupConfig_t *cg);
+
+int get_ulbw_tbslbrm(int scc_bwpsize,
+                     NR_CellGroupConfig_t *cg);
 
 uint32_t nr_compute_tbslbrm(uint16_t table,
 			    uint16_t nb_rb,
@@ -234,4 +265,36 @@ void nr_mac_gNB_rrc_ul_failure_reset(const module_id_t Mod_instP,
                                      const frame_t frameP,
                                      const sub_frame_t subframeP,
                                      const rnti_t rntiP);
+
+uint8_t number_of_bits_set(uint8_t buf);
+
+void compute_rsrp_bitlen(struct NR_CSI_ReportConfig *csi_reportconfig,
+                         uint8_t nb_resources,
+                         nr_csi_report_t *csi_report);
+
+uint8_t compute_ri_bitlen(struct NR_CSI_ReportConfig *csi_reportconfig,
+                          nr_csi_report_t *csi_report);
+
+void compute_li_bitlen(struct NR_CSI_ReportConfig *csi_reportconfig,
+                       uint8_t ri_restriction,
+                       nr_csi_report_t *csi_report);
+
+void get_n1n2_o1o2_singlepanel(int *n1, int *n2, int *o1, int *o2,
+                               struct NR_CodebookConfig__codebookType__type1__subType__typeI_SinglePanel__nrOfAntennaPorts__moreThanTwo *morethantwo);
+
+void get_x1x2_bitlen_singlepanel(int n1, int n2, int o1, int o2,
+                                 int *x1, int *x2, int rank, int codebook_mode);
+
+void compute_pmi_bitlen(struct NR_CSI_ReportConfig *csi_reportconfig,
+                        uint8_t ri_restriction,
+                        nr_csi_report_t *csi_report);
+
+void compute_cqi_bitlen(struct NR_CSI_ReportConfig *csi_reportconfig,
+                        uint8_t ri_restriction,
+                        nr_csi_report_t *csi_report);
+
+void compute_csi_bitlen(NR_CSI_MeasConfig_t *csi_MeasConfig, nr_csi_report_t *csi_report_template);
+
+uint16_t nr_get_csi_bitlen(nr_csi_report_t *csi_report_template, uint8_t csi_report_id);
+
 #endif

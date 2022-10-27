@@ -1,6 +1,6 @@
 
 import { UntypedFormArray, FormControl, UntypedFormGroup } from '@angular/forms';
-import { IArgType, IParam, IRow } from '../api/commands.api';
+import { IArgType, IParam, IRow, IVariable } from '../api/commands.api';
 import { ParamCtrl } from './param.control';
 
 
@@ -14,7 +14,8 @@ export class RowCtrl extends UntypedFormGroup {
 
   cmdName: string
   rawIndex: number
-
+  cmdparam?: IVariable
+  
   constructor(row: IRow) {
     super({})
 
@@ -31,6 +32,10 @@ export class RowCtrl extends UntypedFormGroup {
     this.setControl(RowFCN.paramsFA, fa);
   }
 
+  set_cmdparam(cmdparam: IVariable) {
+    this.cmdparam=cmdparam;
+  }
+
   get paramsCtrls(): ParamCtrl[] {
     return this.paramsFA.controls as ParamCtrl[]
   }
@@ -40,7 +45,8 @@ export class RowCtrl extends UntypedFormGroup {
     const doc: IRow = {
       rawIndex: this.rawIndex,
       cmdName: this.cmdName,
-      params: this.paramsCtrls.map(control => control.api())
+      params: this.paramsCtrls.map(control => control.api()),
+      param: this.cmdparam
     }
 
     return doc

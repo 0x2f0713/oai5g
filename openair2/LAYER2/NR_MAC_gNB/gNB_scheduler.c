@@ -73,7 +73,7 @@ void clear_nr_nfapi_information(gNB_MAC_INST * gNB,
   nfapi_nr_dl_tti_request_t    *DL_req = &gNB->DL_req[0];
   nfapi_nr_dl_tti_pdcch_pdu_rel15_t **pdcch = (nfapi_nr_dl_tti_pdcch_pdu_rel15_t **)gNB->pdcch_pdu_idx[CC_idP];
   nfapi_nr_ul_tti_request_t    *future_ul_tti_req =
-      &gNB->UL_tti_req_ahead[CC_idP][(slotP + num_slots - 1) % num_slots];
+    &gNB->UL_tti_req_ahead[CC_idP][(slotP + num_slots - 1) % num_slots];
   nfapi_nr_ul_dci_request_t    *UL_dci_req = &gNB->UL_dci_req[0];
   nfapi_nr_tx_data_request_t   *TX_req = &gNB->TX_req[0];
 
@@ -133,6 +133,9 @@ void gNB_dlsch_ulsch_scheduler(module_id_t module_idP,
       gNB->tdd_beam_association[i] = -1;
   }
 
+  gNB->frame = frame;
+  gNB->slot = slot;
+
   start_meas(&RC.nrmac[module_idP]->eNB_scheduler);
   VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_gNB_DLSCH_ULSCH_SCHEDULER,VCD_FUNCTION_IN);
 
@@ -178,8 +181,7 @@ void gNB_dlsch_ulsch_scheduler(module_id_t module_idP,
 
 
   if ((slot == 0) && (frame & 127) == 0) {
-    char stats_output[16384];
-    stats_output[0] = '\0';
+    char stats_output[16000] = {0};
     dump_mac_stats(RC.nrmac[module_idP], stats_output, sizeof(stats_output), true);
     LOG_I(NR_MAC, "Frame.Slot %d.%d\n%s\n", frame, slot, stats_output);
   }

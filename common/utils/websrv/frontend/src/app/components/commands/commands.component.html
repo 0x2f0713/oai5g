@@ -32,7 +32,7 @@
             <mat-form-field>
               <mat-label>Module</mat-label>
               <mat-select (selectionChange)="onModuleSelect($event.value)" [(value)]="selectedModule">
-                <mat-option *ngFor="let module of modules" [value]="module"> {{ module.name }}
+                <mat-option  *ngFor="let module of modules" [value]="module"> {{ module.name }}
                 </mat-option>
               </mat-select>
             </mat-form-field>
@@ -40,7 +40,7 @@
           <div  *ngIf="cmds$ | async as cmds">
             <div *ngIf="cmds.length">
               <mat-chip-list>
-                <mat-chip *ngFor="let cmd of cmds" (click)="onCmdSubmit(cmd)"> {{cmd.nameFC.value}}
+                <mat-chip *ngFor="let cmd of cmds" (click)="onCmdSubmit(cmd)" [matTooltip]="cmd.hlp_cmd" > {{cmd.nameFC.value}}
                 </mat-chip>
               </mat-chip-list>
             </div>
@@ -72,7 +72,7 @@
    <mat-grid-tile *ngIf="(rows$ | async)?.length" [colspan]="1" [rowspan]="4">
       <mat-card class="dashboard-card">
         <mat-card-header>
-          <mat-card-title>{{ selectedModule!.name }} {{ selectedCmd!.name }} </mat-card-title>
+          <mat-card-title>{{ selectedModule!.name }} {{ selectedCmd!.name }}  {{ selectedCmd!.param?.value}}</mat-card-title>
         </mat-card-header>
         <mat-card-content class="dashboard-card-content">
            <div >

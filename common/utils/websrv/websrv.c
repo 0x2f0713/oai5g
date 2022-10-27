@@ -169,7 +169,7 @@ return U_CALLBACK_COMPLETE;
 }
 /*------------------------------------------------------------------------------------------------------------------------*/
 int websrv_callback_set_moduleparams(const struct _u_request *request, struct _u_response *response, void *user_data) {
-  websrv_printf_start(response,200);
+  websrv_printf_start(response,200,false);
   LOG_I(UTIL,"[websrv] %s received: %s %s\n",__FUNCTION__,request->http_verb,request->http_url);
 	 json_error_t jserr;
 	 json_t* jsbody = ulfius_get_json_body_request (request, &jserr);
@@ -217,8 +217,22 @@ int websrv_callback_set_moduleparams(const struct _u_request *request, struct _u
 		     for ( telnetshell_cmddef_t *cmd = modulestruct->cmd ; cmd->cmdfunc != NULL ;cmd++) {
                if ( strcmp(cmd->cmdname,cmdName) == 0 && (( cmd->cmdflags & TELNETSRV_CMDFLAG_TELNETONLY) == 0) ){
 				 httpstatus=200;
+				 char *pvalue=NULL;
 				 if(strncmp(cmdName,"show",4) == 0) {
 				   sprintf(cmdName,"%s","set");
+				   if(cmd->cmdflags & TELNETSRV_CMDFLAG_NEEDPARAM) {
+					   json_t *Jparam=json_object_get(jsbody, "param");
+					   if (Jparam != NULL) {
+						 char *pname=NULL;
+						 ures =  json_unpack_ex(Jparam, &jerror,0,"{s:s,s:s}","name",&pname,"value",&pvalue);
+                         if (ures != 0) {
+			                websrv_printf("cannot unpack json param %s\n",jerror.text);
+		                 }else {
+							LOG_I(UTIL,"[websrv] parameter %s=%s\n", pname,pvalue); 
+							snprintf(datatbl.tblname,sizeof(datatbl.tblname),"%s=%s",pname,pvalue); 
+						 }
+					   }
+			       }
 				   cmdName[3]=' ';
 				   }
 			     cmd->webfunc_getdata(cmdName,websrvparams.dbglvl,&datatbl,websrv_printf);
@@ -328,7 +342,7 @@ int websrv_callback_okset_softmodem_cmdvar(const struct _u_request * request, st
 }
 int websrv_callback_set_softmodemvar(const struct _u_request * request, struct _u_response * response, void * user_data) {
 	 LOG_I(UTIL,"[websrv] : callback_set_softmodemvar received %s %s\n",request->http_verb,request->http_url);
-	 websrv_printf_start(response,256);
+	 websrv_printf_start(response,256,false);
 	 json_error_t jserr;
 	 json_t* jsbody = ulfius_get_json_body_request (request, &jserr);
      int httpstatus=404;
@@ -432,13 +446,15 @@ int websrv_processwebfunc(struct _u_response * response, cmdparser_t * modulestr
 	}
 	cmd->webfunc_getdata(cmd->cmdname,websrvparams.dbglvl,(webdatadef_t *)&wdata,NULL);	  
 	websrv_gettbldata_response(response,&wdata,modulestruct->module,cmd->cmdname);
-  } else {
-    websrv_printf_start(response,16384);
+  } else {   
     char *sptr=index(cmd->cmdname,' ');
-    if (cmd->qptr != NULL) 
-      telnet_pushcmd(cmd, (sptr==NULL)?cmd->cmdname:sptr, websrv_printf);
-    else
+    if (cmd->qptr != NULL) {
+      websrv_printf_start(response,16384,true);  
+      telnet_pushcmd(cmd, (sptr==NULL)?cmd->cmdname:sptr, websrv_async_printf);
+    } else {
+	  websrv_printf_start(response,16384,false);
       cmd->cmdfunc((sptr==NULL)?cmd->cmdname:sptr,websrvparams.dbglvl,websrv_printf);
+    }
     websrv_printf_end(http_status,websrvparams.dbglvl);
   }
   return http_status;
@@ -588,6 +604,9 @@ int websrv_callback_get_softmodemcmd(const struct _u_request * request, struct _
 	    if(modulestruct->cmd[j].cmdflags &  TELNETSRV_CMDFLAG_AUTOUPDATE) {
 		  json_array_append_new(jopts , json_string("update"));
         }
+        if(websrv_utils_testhlp(websrvparams.fpath,"cmd",modulestruct->module,modulestruct->cmd[j].cmdname)) {
+          json_array_append_new(jopts , json_string("help"));
+	    }
         if ( json_array_size(jopts) > 0 ) {
 		  json_t *cmdoptions=json_pack("{s:o}","options",jopts);
 		  json_object_update_missing(acmd, cmdoptions);

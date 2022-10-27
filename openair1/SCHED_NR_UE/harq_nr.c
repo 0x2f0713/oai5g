@@ -113,7 +113,7 @@
 *
 *********************************************************************/
 
-void config_uplink_harq_process(PHY_VARS_NR_UE *ue, int gNB_id, int thread_id, int code_word_idx, uint8_t number_harq_processes_pusch)
+void config_uplink_harq_process(PHY_VARS_NR_UE *ue, int gNB_id, int code_word_idx, uint8_t number_harq_processes_pusch)
 {
   NR_UE_ULSCH_t *ulsch;
 
@@ -123,7 +123,7 @@ void config_uplink_harq_process(PHY_VARS_NR_UE *ue, int gNB_id, int thread_id, i
 
     memset(ulsch,0,sizeof(NR_UE_ULSCH_t));
 
-    ue->ulsch[thread_id][gNB_id] = ulsch;
+    ue->ulsch[gNB_id] = ulsch;
   }
   else {
     LOG_E(PHY, "Fatal memory allocation problem at line %d in function %s of file %s \n", __LINE__ , __func__, __FILE__);
@@ -148,7 +148,7 @@ void config_uplink_harq_process(PHY_VARS_NR_UE *ue, int gNB_id, int thread_id, i
   }
 
   for (int slot_tx = 0; slot_tx < NR_MAX_SLOTS_PER_FRAME; slot_tx++) {
-    ue->ulsch[thread_id][gNB_id]->harq_process_id[slot_tx] = NR_MAX_HARQ_PROCESSES;
+    ue->ulsch[gNB_id]->harq_process_id[slot_tx] = NR_MAX_HARQ_PROCESSES;
   }
 }
 
@@ -165,9 +165,9 @@ void config_uplink_harq_process(PHY_VARS_NR_UE *ue, int gNB_id, int thread_id, i
 *
 *********************************************************************/
 
-void release_uplink_harq_process(PHY_VARS_NR_UE *ue, int gNB_id, int thread_id, int code_word_idx)
+void release_uplink_harq_process(PHY_VARS_NR_UE *ue, int gNB_id, int code_word_idx)
 {
-  NR_UE_ULSCH_t *ulsch = ue->ulsch[thread_id][gNB_id];
+  NR_UE_ULSCH_t *ulsch = ue->ulsch[gNB_id];
 
   for (int process_id = 0; process_id < ulsch->number_harq_processes_for_pusch; process_id++) {
 
@@ -178,7 +178,7 @@ void release_uplink_harq_process(PHY_VARS_NR_UE *ue, int gNB_id, int thread_id, 
 
   free16(ulsch, sizeof(NR_UE_ULSCH_t));
 
-  ue->ulsch[thread_id][gNB_id] = NULL;
+  ue->ulsch[gNB_id] = NULL;
 }
 
 /*******************************************************************
@@ -308,7 +308,7 @@ void init_downlink_harq_status(NR_DL_UE_HARQ_t *dl_harq)
   dl_harq->status = SCH_IDLE;
   dl_harq->first_rx = 1;
   dl_harq->DLround  = 0;
-  dl_harq->DCINdi = 1;
+  dl_harq->Ndi = 2; // set to an invalid value
   dl_harq->ack = DL_ACKNACK_NO_SET;
 }
 
@@ -329,7 +329,7 @@ void init_downlink_harq_status(NR_DL_UE_HARQ_t *dl_harq)
 *
 *********************************************************************/
 
-void downlink_harq_process(NR_DL_UE_HARQ_t *dl_harq, int harq_pid, int ndi, int rv, uint8_t rnti_type) {
+void downlink_harq_process(NR_DL_UE_HARQ_t *dl_harq, int harq_pid, int dci_ndi, int rv, uint8_t rnti_type) {
 
   if (rnti_type == _SI_RNTI_ ||
       rnti_type == _P_RNTI_ ||
@@ -339,10 +339,9 @@ void downlink_harq_process(NR_DL_UE_HARQ_t *dl_harq, int harq_pid, int ndi, int 
     dl_harq->first_rx = 1;
   }  else {
     LOG_D(PHY,"receive harq process: %p harqPid=%d, rv=%d, ndi=%d, rntiType=%d new transmission= %s\n",
-	  dl_harq, harq_pid, rv, ndi, rnti_type, dl_harq->DCINdi != ndi ? "yes":"no");
+	  dl_harq, harq_pid, rv, dci_ndi, rnti_type, dl_harq->Ndi != dci_ndi ? "yes":"no");
     AssertFatal(rv<4 && rv>=0, "invalid redondancy version %d\n", rv);
-    
-    if (ndi!=dl_harq->DCINdi) {
+    if (dci_ndi!=dl_harq->Ndi) {
       if (dl_harq->ack == DL_NACK)
         LOG_D(PHY,"New transmission on a harq pid (%d) never acknowledged\n", harq_pid);
       else
@@ -354,7 +353,7 @@ void downlink_harq_process(NR_DL_UE_HARQ_t *dl_harq, int harq_pid, int ndi, int 
         LOG_D(PHY,"Starting retransmission on a harq pid (%d), rv (%d)\n", harq_pid, rv);
     }
 
-    if (ndi!=dl_harq->DCINdi) {
+    if (dci_ndi!=dl_harq->Ndi) {
       dl_harq->first_rx = true;
       dl_harq->DLround = 0;
     } else {
@@ -364,7 +363,7 @@ void downlink_harq_process(NR_DL_UE_HARQ_t *dl_harq, int harq_pid, int ndi, int 
     
     dl_harq->status = ACTIVE;
 
-    dl_harq->DCINdi = ndi;
+    dl_harq->Ndi = dci_ndi;
     //dl_harq->status = SCH_IDLE;
    }
 }

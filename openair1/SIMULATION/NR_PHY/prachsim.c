@@ -54,6 +54,7 @@
 #include <openair2/RRC/NR_UE/rrc_defs.h>
 //#include "openair1/SIMULATION/NR_PHY/nr_dummy_functions.c"
 #include <openair3/ocp-gtpu/gtp_itf.h>
+#include "executables/nr-uesoftmodem.h"
 
 #define NR_PRACH_DEBUG 1
 #define PRACH_WRITE_OUTPUT_DEBUG 1
@@ -92,9 +93,17 @@ int oai_nfapi_nr_rach_indication(nfapi_nr_rach_indication_t *ind) { return(0);  
 //Fixme: Uniq dirty DU instance, by global var, datamodel need better management
 instance_t DUuniqInstance=0;
 instance_t CUuniqInstance=0;
-teid_t newGtpuCreateTunnel(instance_t instance, rnti_t rnti, int incoming_bearer_id, int outgoing_bearer_id, teid_t outgoing_teid,
-                           transport_layer_addr_t remoteAddr, int port, gtpCallback callBack) {
-return 0;
+teid_t newGtpuCreateTunnel(instance_t instance,
+                           rnti_t rnti,
+                           int incoming_bearer_id,
+                           int outgoing_bearer_id,
+                           teid_t outgoing_teid,
+                           int qfi,
+                           transport_layer_addr_t remoteAddr,
+                           int port,
+                           gtpCallback callBack,
+                           gtpCallbackSDAP callBackSDAP) {
+  return 0;
 }
 
 int newGtpuDeleteAllTunnels(instance_t instance, rnti_t rnti) {
@@ -214,12 +223,6 @@ int DU_send_INITIAL_UL_RRC_MESSAGE_TRANSFER(module_id_t     module_idP,
                                             sdu_size_t      sdu2_lenP) {
   return 0;
 }
-
-typedef struct {
-  uint64_t       optmask;   //mask to store boolean config options
-  uint8_t        nr_dlsch_parallel; // number of threads for dlsch decoding, 0 means no parallelization
-  tpool_t        Tpool;             // thread pool
-} nrUE_params_t;
 
 nrUE_params_t nrUE_params;
 

@@ -32,6 +32,8 @@
 #ifndef __NR_LDPC_DECODER_CNPROC__H__
 #define __NR_LDPC_DECODER_CNPROC__H__
 
+#include "PHY/sse_intrin.h"
+
 /**
    \brief Performs CN processing for BG2 on the CN processing buffer and stores the results in the CN processing results buffer.
    \param p_lut Pointer to decoder LUTs
@@ -39,12 +41,9 @@
    \param Z Lifting size
 */
 
-
-#ifdef __AVX512BW__
+#if defined(__AVX512BW__)
 #include "nrLDPC_cnProc_avx512.h"
-
 #else
-
 static inline void nrLDPC_cnProc_BG2(t_nrLDPC_lut* p_lut, int8_t* cnProcBuf, int8_t* cnProcBufRes, uint16_t Z)
 {
     const uint8_t*  lut_numCnInCnGroups   = p_lut->numCnInCnGroups;
@@ -102,20 +101,20 @@ static inline void nrLDPC_cnProc_BG2(t_nrLDPC_lut* p_lut, int8_t* cnProcBuf, int
                 // Abs and sign of 32 CNs (first BN)
               //                ymm0 = p_cnProcBuf[lut_idxCnProcG3[j][0] + i];
                 ymm0 = pj0[i];
-                sgn  = _mm256_sign_epi8(*p_ones, ymm0);
-                min  = _mm256_abs_epi8(ymm0);
+                sgn  = simde_mm256_sign_epi8(*p_ones, ymm0);
+                min  = simde_mm256_abs_epi8(ymm0);
 
                 // 32 CNs of second BN
                 //  ymm0 = p_cnProcBuf[lut_idxCnProcG3[j][1] + i];
                 ymm0 = pj1[i];
-                min  = _mm256_min_epu8(min, _mm256_abs_epi8(ymm0));
-                sgn  = _mm256_sign_epi8(sgn, ymm0);
+                min  = simde_mm256_min_epu8(min, simde_mm256_abs_epi8(ymm0));
+                sgn  = simde_mm256_sign_epi8(sgn, ymm0);
 
                 // Store result
-                min = _mm256_min_epu8(min, *p_maxLLR); // 128 in epi8 is -127
-                //*p_cnProcBufResBit = _mm256_sign_epi8(min, sgn);
+                min = simde_mm256_min_epu8(min, *p_maxLLR); // 128 in epi8 is -127
+                //*p_cnProcBufResBit = simde_mm256_sign_epi8(min, sgn);
                 //p_cnProcBufResBit++;
-                p_cnProcBufResBit[i]=_mm256_sign_epi8(min, sgn);
+                p_cnProcBufResBit[i]=simde_mm256_sign_epi8(min, sgn);
             }
         }
     }
@@ -149,20 +148,20 @@ static inline void nrLDPC_cnProc_BG2(t_nrLDPC_lut* p_lut, int8_t* cnProcBuf, int
             {
                 // Abs and sign of 32 CNs (first BN)
                 ymm0 = p_cnProcBuf[lut_idxCnProcG4[j][0] + i];
-                sgn  = _mm256_sign_epi8(*p_ones, ymm0);
-                min  = _mm256_abs_epi8(ymm0);
+                sgn  = simde_mm256_sign_epi8(*p_ones, ymm0);
+                min  = simde_mm256_abs_epi8(ymm0);
 
                 // Loop over BNs
                 for (k=1; k<3; k++)
                 {
                     ymm0 = p_cnProcBuf[lut_idxCnProcG4[j][k] + i];
-                    min  = _mm256_min_epu8(min, _mm256_abs_epi8(ymm0));
-                    sgn  = _mm256_sign_epi8(sgn, ymm0);
+                    min  = simde_mm256_min_epu8(min, simde_mm256_abs_epi8(ymm0));
+                    sgn  = simde_mm256_sign_epi8(sgn, ymm0);
                 }
 
                 // Store result
-                min = _mm256_min_epu8(min, *p_maxLLR); // 128 in epi8 is -127
-                *p_cnProcBufResBit = _mm256_sign_epi8(min, sgn);
+                min = simde_mm256_min_epu8(min, *p_maxLLR); // 128 in epi8 is -127
+                *p_cnProcBufResBit = simde_mm256_sign_epi8(min, sgn);
                 p_cnProcBufResBit++;
             }
         }
@@ -198,20 +197,20 @@ static inline void nrLDPC_cnProc_BG2(t_nrLDPC_lut* p_lut, int8_t* cnProcBuf, int
             {
                 // Abs and sign of 32 CNs (first BN)
                 ymm0 = p_cnProcBuf[lut_idxCnProcG5[j][0] + i];
-                sgn  = _mm256_sign_epi8(*p_ones, ymm0);
-                min  = _mm256_abs_epi8(ymm0);
+                sgn  = simde_mm256_sign_epi8(*p_ones, ymm0);
+                min  = simde_mm256_abs_epi8(ymm0);
 
                 // Loop over BNs
                 for (k=1; k<4; k++)
                 {
                     ymm0 = p_cnProcBuf[lut_idxCnProcG5[j][k] + i];
-                    min  = _mm256_min_epu8(min, _mm256_abs_epi8(ymm0));
-                    sgn  = _mm256_sign_epi8(sgn, ymm0);
+                    min  = simde_mm256_min_epu8(min, simde_mm256_abs_epi8(ymm0));
+                    sgn  = simde_mm256_sign_epi8(sgn, ymm0);
                 }
 
                 // Store result
-                min = _mm256_min_epu8(min, *p_maxLLR); // 128 in epi8 is -127
-                *p_cnProcBufResBit = _mm256_sign_epi8(min, sgn);
+                min = simde_mm256_min_epu8(min, *p_maxLLR); // 128 in epi8 is -127
+                *p_cnProcBufResBit = simde_mm256_sign_epi8(min, sgn);
                 p_cnProcBufResBit++;
             }
         }
@@ -248,20 +247,20 @@ static inline void nrLDPC_cnProc_BG2(t_nrLDPC_lut* p_lut, int8_t* cnProcBuf, int
             {
                 // Abs and sign of 32 CNs (first BN)
                 ymm0 = p_cnProcBuf[lut_idxCnProcG6[j][0] + i];
-                sgn  = _mm256_sign_epi8(*p_ones, ymm0);
-                min  = _mm256_abs_epi8(ymm0);
+                sgn  = simde_mm256_sign_epi8(*p_ones, ymm0);
+                min  = simde_mm256_abs_epi8(ymm0);
 
                 // Loop over BNs
                 for (k=1; k<5; k++)
                 {
                     ymm0 = p_cnProcBuf[lut_idxCnProcG6[j][k] + i];
-                    min  = _mm256_min_epu8(min, _mm256_abs_epi8(ymm0));
-                    sgn  = _mm256_sign_epi8(sgn, ymm0);
+                    min  = simde_mm256_min_epu8(min, simde_mm256_abs_epi8(ymm0));
+                    sgn  = simde_mm256_sign_epi8(sgn, ymm0);
                 }
 
                 // Store result
-                min = _mm256_min_epu8(min, *p_maxLLR); // 128 in epi8 is -127
-                *p_cnProcBufResBit = _mm256_sign_epi8(min, sgn);
+                min = simde_mm256_min_epu8(min, *p_maxLLR); // 128 in epi8 is -127
+                *p_cnProcBufResBit = simde_mm256_sign_epi8(min, sgn);
                 p_cnProcBufResBit++;
             }
         }
@@ -299,20 +298,20 @@ static inline void nrLDPC_cnProc_BG2(t_nrLDPC_lut* p_lut, int8_t* cnProcBuf, int
             {
                 // Abs and sign of 32 CNs (first BN)
                 ymm0 = p_cnProcBuf[lut_idxCnProcG8[j][0] + i];
-                sgn  = _mm256_sign_epi8(*p_ones, ymm0);
-                min  = _mm256_abs_epi8(ymm0);
+                sgn  = simde_mm256_sign_epi8(*p_ones, ymm0);
+                min  = simde_mm256_abs_epi8(ymm0);
 
                 // Loop over BNs
                 for (k=1; k<7; k++)
                 {
                     ymm0 = p_cnProcBuf[lut_idxCnProcG8[j][k] + i];
-                    min  = _mm256_min_epu8(min, _mm256_abs_epi8(ymm0));
-                    sgn  = _mm256_sign_epi8(sgn, ymm0);
+                    min  = simde_mm256_min_epu8(min, simde_mm256_abs_epi8(ymm0));
+                    sgn  = simde_mm256_sign_epi8(sgn, ymm0);
                 }
 
                 // Store result
-                min = _mm256_min_epu8(min, *p_maxLLR); // 128 in epi8 is -127
-                *p_cnProcBufResBit = _mm256_sign_epi8(min, sgn);
+                min = simde_mm256_min_epu8(min, *p_maxLLR); // 128 in epi8 is -127
+                *p_cnProcBufResBit = simde_mm256_sign_epi8(min, sgn);
                 p_cnProcBufResBit++;
             }
         }
@@ -351,20 +350,20 @@ static inline void nrLDPC_cnProc_BG2(t_nrLDPC_lut* p_lut, int8_t* cnProcBuf, int
             {
                 // Abs and sign of 32 CNs (first BN)
                 ymm0 = p_cnProcBuf[lut_idxCnProcG10[j][0] + i];
-                sgn  = _mm256_sign_epi8(*p_ones, ymm0);
-                min  = _mm256_abs_epi8(ymm0);
+                sgn  = simde_mm256_sign_epi8(*p_ones, ymm0);
+                min  = simde_mm256_abs_epi8(ymm0);
 
                 // Loop over BNs
                 for (k=1; k<9; k++)
                 {
                     ymm0 = p_cnProcBuf[lut_idxCnProcG10[j][k] + i];
-                    min  = _mm256_min_epu8(min, _mm256_abs_epi8(ymm0));
-                    sgn  = _mm256_sign_epi8(sgn, ymm0);
+                    min  = simde_mm256_min_epu8(min, simde_mm256_abs_epi8(ymm0));
+                    sgn  = simde_mm256_sign_epi8(sgn, ymm0);
                 }
 
                 // Store result
-                min = _mm256_min_epu8(min, *p_maxLLR); // 128 in epi8 is -127
-                *p_cnProcBufResBit = _mm256_sign_epi8(min, sgn);
+                min = simde_mm256_min_epu8(min, *p_maxLLR); // 128 in epi8 is -127
+                *p_cnProcBufResBit = simde_mm256_sign_epi8(min, sgn);
                 p_cnProcBufResBit++;
             }
         }
@@ -440,18 +439,18 @@ static inline void nrLDPC_cnProc_BG1(t_nrLDPC_lut* p_lut, int8_t* cnProcBuf, int
             {
                 // Abs and sign of 32 CNs (first BN)
                 ymm0 = p_cnProcBuf[lut_idxCnProcG3[j][0] + i];
-                sgn  = _mm256_sign_epi8(*p_ones, ymm0);
-                min  = _mm256_abs_epi8(ymm0);
+                sgn  = simde_mm256_sign_epi8(*p_ones, ymm0);
+                min  = simde_mm256_abs_epi8(ymm0);
 
                 // 32 CNs of second BN
                 ymm0 = p_cnProcBuf[lut_idxCnProcG3[j][1] + i];
-                min  = _mm256_min_epu8(min, _mm256_abs_epi8(ymm0));
-                sgn  = _mm256_sign_epi8(sgn, ymm0);
+                min  = simde_mm256_min_epu8(min, simde_mm256_abs_epi8(ymm0));
+                sgn  = simde_mm256_sign_epi8(sgn, ymm0);
 
 
                 // Store result
-                min = _mm256_min_epu8(min, *p_maxLLR); // 128 in epi8 is -127
-                *p_cnProcBufResBit = _mm256_sign_epi8(min, sgn);
+                min = simde_mm256_min_epu8(min, *p_maxLLR); // 128 in epi8 is -127
+                *p_cnProcBufResBit = simde_mm256_sign_epi8(min, sgn);
                 p_cnProcBufResBit++;
             }
         }
@@ -487,20 +486,20 @@ static inline void nrLDPC_cnProc_BG1(t_nrLDPC_lut* p_lut, int8_t* cnProcBuf, int
             {
                 // Abs and sign of 32 CNs (first BN)
                 ymm0 = p_cnProcBuf[lut_idxCnProcG4[j][0] + i];
-                sgn  = _mm256_sign_epi8(*p_ones, ymm0);
-                min  = _mm256_abs_epi8(ymm0);
+                sgn  = simde_mm256_sign_epi8(*p_ones, ymm0);
+                min  = simde_mm256_abs_epi8(ymm0);
 
                 // Loop over BNs
                 for (k=1; k<3; k++)
                 {
                     ymm0 = p_cnProcBuf[lut_idxCnProcG4[j][k] + i];
-                    min  = _mm256_min_epu8(min, _mm256_abs_epi8(ymm0));
-                    sgn  = _mm256_sign_epi8(sgn, ymm0);
+                    min  = simde_mm256_min_epu8(min, simde_mm256_abs_epi8(ymm0));
+                    sgn  = simde_mm256_sign_epi8(sgn, ymm0);
                 }
 
                 // Store result
-                min = _mm256_min_epu8(min, *p_maxLLR); // 128 in epi8 is -127
-                *p_cnProcBufResBit = _mm256_sign_epi8(min, sgn);
+                min = simde_mm256_min_epu8(min, *p_maxLLR); // 128 in epi8 is -127
+                *p_cnProcBufResBit = simde_mm256_sign_epi8(min, sgn);
                 p_cnProcBufResBit++;
             }
         }
@@ -537,20 +536,20 @@ static inline void nrLDPC_cnProc_BG1(t_nrLDPC_lut* p_lut, int8_t* cnProcBuf, int
             {
                 // Abs and sign of 32 CNs (first BN)
                 ymm0 = p_cnProcBuf[lut_idxCnProcG5[j][0] + i];
-                sgn  = _mm256_sign_epi8(*p_ones, ymm0);
-                min  = _mm256_abs_epi8(ymm0);
+                sgn  = simde_mm256_sign_epi8(*p_ones, ymm0);
+                min  = simde_mm256_abs_epi8(ymm0);
 
                 // Loop over BNs
                 for (k=1; k<4; k++)
                 {
                     ymm0 = p_cnProcBuf[lut_idxCnProcG5[j][k] + i];
-                    min  = _mm256_min_epu8(min, _mm256_abs_epi8(ymm0));
-                    sgn  = _mm256_sign_epi8(sgn, ymm0);
+                    min  = simde_mm256_min_epu8(min, simde_mm256_abs_epi8(ymm0));
+                    sgn  = simde_mm256_sign_epi8(sgn, ymm0);
                 }
 
                 // Store result
-                min = _mm256_min_epu8(min, *p_maxLLR); // 128 in epi8 is -127
-                *p_cnProcBufResBit = _mm256_sign_epi8(min, sgn);
+                min = simde_mm256_min_epu8(min, *p_maxLLR); // 128 in epi8 is -127
+                *p_cnProcBufResBit = simde_mm256_sign_epi8(min, sgn);
                 p_cnProcBufResBit++;
             }
         }
@@ -588,20 +587,20 @@ static inline void nrLDPC_cnProc_BG1(t_nrLDPC_lut* p_lut, int8_t* cnProcBuf, int
             {
                 // Abs and sign of 32 CNs (first BN)
                 ymm0 = p_cnProcBuf[lut_idxCnProcG6[j][0] + i];
-                sgn  = _mm256_sign_epi8(*p_ones, ymm0);
-                min  = _mm256_abs_epi8(ymm0);
+                sgn  = simde_mm256_sign_epi8(*p_ones, ymm0);
+                min  = simde_mm256_abs_epi8(ymm0);
 
                 // Loop over BNs
                 for (k=1; k<5; k++)
                 {
                     ymm0 = p_cnProcBuf[lut_idxCnProcG6[j][k] + i];
-                    min  = _mm256_min_epu8(min, _mm256_abs_epi8(ymm0));
-                    sgn  = _mm256_sign_epi8(sgn, ymm0);
+                    min  = simde_mm256_min_epu8(min, simde_mm256_abs_epi8(ymm0));
+                    sgn  = simde_mm256_sign_epi8(sgn, ymm0);
                 }
 
                 // Store result
-                min = _mm256_min_epu8(min, *p_maxLLR); // 128 in epi8 is -127
-                *p_cnProcBufResBit = _mm256_sign_epi8(min, sgn);
+                min = simde_mm256_min_epu8(min, *p_maxLLR); // 128 in epi8 is -127
+                *p_cnProcBufResBit = simde_mm256_sign_epi8(min, sgn);
                 p_cnProcBufResBit++;
             }
         }
@@ -640,20 +639,20 @@ static inline void nrLDPC_cnProc_BG1(t_nrLDPC_lut* p_lut, int8_t* cnProcBuf, int
             {
                 // Abs and sign of 32 CNs (first BN)
                 ymm0 = p_cnProcBuf[lut_idxCnProcG7[j][0] + i];
-                sgn  = _mm256_sign_epi8(*p_ones, ymm0);
-                min  = _mm256_abs_epi8(ymm0);
+                sgn  = simde_mm256_sign_epi8(*p_ones, ymm0);
+                min  = simde_mm256_abs_epi8(ymm0);
 
                 // Loop over BNs
                 for (k=1; k<6; k++)
                 {
                     ymm0 = p_cnProcBuf[lut_idxCnProcG7[j][k] + i];
-                    min  = _mm256_min_epu8(min, _mm256_abs_epi8(ymm0));
-                    sgn  = _mm256_sign_epi8(sgn, ymm0);
+                    min  = simde_mm256_min_epu8(min, simde_mm256_abs_epi8(ymm0));
+                    sgn  = simde_mm256_sign_epi8(sgn, ymm0);
                 }
 
                 // Store result
-                min = _mm256_min_epu8(min, *p_maxLLR); // 128 in epi8 is -127
-                *p_cnProcBufResBit = _mm256_sign_epi8(min, sgn);
+                min = simde_mm256_min_epu8(min, *p_maxLLR); // 128 in epi8 is -127
+                *p_cnProcBufResBit = simde_mm256_sign_epi8(min, sgn);
                 p_cnProcBufResBit++;
             }
         }
@@ -692,20 +691,20 @@ static inline void nrLDPC_cnProc_BG1(t_nrLDPC_lut* p_lut, int8_t* cnProcBuf, int
             {
                 // Abs and sign of 32 CNs (first BN)
                 ymm0 = p_cnProcBuf[lut_idxCnProcG8[j][0] + i];
-                sgn  = _mm256_sign_epi8(*p_ones, ymm0);
-                min  = _mm256_abs_epi8(ymm0);
+                sgn  = simde_mm256_sign_epi8(*p_ones, ymm0);
+                min  = simde_mm256_abs_epi8(ymm0);
 
                 // Loop over BNs
                 for (k=1; k<7; k++)
                 {
                     ymm0 = p_cnProcBuf[lut_idxCnProcG8[j][k] + i];
-                    min  = _mm256_min_epu8(min, _mm256_abs_epi8(ymm0));
-                    sgn  = _mm256_sign_epi8(sgn, ymm0);
+                    min  = simde_mm256_min_epu8(min, simde_mm256_abs_epi8(ymm0));
+                    sgn  = simde_mm256_sign_epi8(sgn, ymm0);
                 }
 
                 // Store result
-                min = _mm256_min_epu8(min, *p_maxLLR); // 128 in epi8 is -127
-                *p_cnProcBufResBit = _mm256_sign_epi8(min, sgn);
+                min = simde_mm256_min_epu8(min, *p_maxLLR); // 128 in epi8 is -127
+                *p_cnProcBufResBit = simde_mm256_sign_epi8(min, sgn);
                 p_cnProcBufResBit++;
             }
         }
@@ -745,20 +744,20 @@ static inline void nrLDPC_cnProc_BG1(t_nrLDPC_lut* p_lut, int8_t* cnProcBuf, int
             {
                 // Abs and sign of 32 CNs (first BN)
                 ymm0 = p_cnProcBuf[lut_idxCnProcG9[j][0] + i];
-                sgn  = _mm256_sign_epi8(*p_ones, ymm0);
-                min  = _mm256_abs_epi8(ymm0);
+                sgn  = simde_mm256_sign_epi8(*p_ones, ymm0);
+                min  = simde_mm256_abs_epi8(ymm0);
 
                 // Loop over BNs
                 for (k=1; k<8; k++)
                 {
                     ymm0 = p_cnProcBuf[lut_idxCnProcG9[j][k] + i];
-                    min  = _mm256_min_epu8(min, _mm256_abs_epi8(ymm0));
-                    sgn  = _mm256_sign_epi8(sgn, ymm0);
+                    min  = simde_mm256_min_epu8(min, simde_mm256_abs_epi8(ymm0));
+                    sgn  = simde_mm256_sign_epi8(sgn, ymm0);
                 }
 
                 // Store result
-                min = _mm256_min_epu8(min, *p_maxLLR); // 128 in epi8 is -127
-                *p_cnProcBufResBit = _mm256_sign_epi8(min, sgn);
+                min = simde_mm256_min_epu8(min, *p_maxLLR); // 128 in epi8 is -127
+                *p_cnProcBufResBit = simde_mm256_sign_epi8(min, sgn);
                 p_cnProcBufResBit++;
             }
         }
@@ -798,20 +797,20 @@ static inline void nrLDPC_cnProc_BG1(t_nrLDPC_lut* p_lut, int8_t* cnProcBuf, int
             {
                 // Abs and sign of 32 CNs (first BN)
                 ymm0 = p_cnProcBuf[lut_idxCnProcG10[j][0] + i];
-                sgn  = _mm256_sign_epi8(*p_ones, ymm0);
-                min  = _mm256_abs_epi8(ymm0);
+                sgn  = simde_mm256_sign_epi8(*p_ones, ymm0);
+                min  = simde_mm256_abs_epi8(ymm0);
 
                 // Loop over BNs
                 for (k=1; k<9; k++)
                 {
                     ymm0 = p_cnProcBuf[lut_idxCnProcG10[j][k] + i];
-                    min  = _mm256_min_epu8(min, _mm256_abs_epi8(ymm0));
-                    sgn  = _mm256_sign_epi8(sgn, ymm0);
+                    min  = simde_mm256_min_epu8(min, simde_mm256_abs_epi8(ymm0));
+                    sgn  = simde_mm256_sign_epi8(sgn, ymm0);
                 }
 
                 // Store result
-                min = _mm256_min_epu8(min, *p_maxLLR); // 128 in epi8 is -127
-                *p_cnProcBufResBit = _mm256_sign_epi8(min, sgn);
+                min = simde_mm256_min_epu8(min, *p_maxLLR); // 128 in epi8 is -127
+                *p_cnProcBufResBit = simde_mm256_sign_epi8(min, sgn);
                 p_cnProcBufResBit++;
             }
         }
@@ -856,20 +855,20 @@ static inline void nrLDPC_cnProc_BG1(t_nrLDPC_lut* p_lut, int8_t* cnProcBuf, int
             {
                 // Abs and sign of 32 CNs (first BN)
                 ymm0 = p_cnProcBuf[lut_idxCnProcG19[j][0] + i];
-                sgn  = _mm256_sign_epi8(*p_ones, ymm0);
-                min  = _mm256_abs_epi8(ymm0);
+                sgn  = simde_mm256_sign_epi8(*p_ones, ymm0);
+                min  = simde_mm256_abs_epi8(ymm0);
 
                 // Loop over BNs
                 for (k=1; k<18; k++)
                 {
                     ymm0 = p_cnProcBuf[lut_idxCnProcG19[j][k] + i];
-                    min  = _mm256_min_epu8(min, _mm256_abs_epi8(ymm0));
-                    sgn  = _mm256_sign_epi8(sgn, ymm0);
+                    min  = simde_mm256_min_epu8(min, simde_mm256_abs_epi8(ymm0));
+                    sgn  = simde_mm256_sign_epi8(sgn, ymm0);
                 }
 
                 // Store result
-                min = _mm256_min_epu8(min, *p_maxLLR); // 128 in epi8 is -127
-                *p_cnProcBufResBit = _mm256_sign_epi8(min, sgn);
+                min = simde_mm256_min_epu8(min, *p_maxLLR); // 128 in epi8 is -127
+                *p_cnProcBufResBit = simde_mm256_sign_epi8(min, sgn);
                 p_cnProcBufResBit++;
             }
         }
@@ -878,6 +877,7 @@ static inline void nrLDPC_cnProc_BG1(t_nrLDPC_lut* p_lut, int8_t* cnProcBuf, int
 }
 
 #endif
+
 /**
    \brief Performs parity check for BG1 on the CN processing buffer. Stops as soon as error is detected.
    \param p_lut Pointer to decoder LUTs
@@ -937,7 +937,7 @@ static inline uint32_t nrLDPC_cnProcPc_BG1(t_nrLDPC_lut* p_lut, int8_t* cnProcBu
 
                 // Add BN and input LLR, extract the sign bit
                 // and add in GF(2) (xor)
-                pcRes ^= _mm256_movemask_epi8(_mm256_adds_epi8(ymm0,ymm1));
+                pcRes ^= simde_mm256_movemask_epi8(simde_mm256_adds_epi8(ymm0,ymm1));
             }
 
             // If no error pcRes should be 0
@@ -956,12 +956,13 @@ static inline uint32_t nrLDPC_cnProcPc_BG1(t_nrLDPC_lut* p_lut, int8_t* cnProcBu
 
             // Add BN and input LLR, extract the sign bit
             // and add in GF(2) (xor)
-            pcRes ^= _mm256_movemask_epi8(_mm256_adds_epi8(ymm0,ymm1));
+            pcRes ^= simde_mm256_movemask_epi8(simde_mm256_adds_epi8(ymm0,ymm1));
         }
 
         // If no error pcRes should be 0
         // Only use valid CNs
-        pcResSum |= (pcRes&(0xFFFFFFFF>>(32-Mrem)));
+        if (Mrem)
+          pcResSum |= (pcRes&(0xFFFFFFFF>>(32-Mrem)));
 
         // If PC failed we can stop here
         if (pcResSum > 0)
@@ -1004,7 +1005,7 @@ static inline uint32_t nrLDPC_cnProcPc_BG1(t_nrLDPC_lut* p_lut, int8_t* cnProcBu
 
                 // Add BN and input LLR, extract the sign bit
                 // and add in GF(2) (xor)
-                pcRes ^= _mm256_movemask_epi8(_mm256_adds_epi8(ymm0,ymm1));
+                pcRes ^= simde_mm256_movemask_epi8(simde_mm256_adds_epi8(ymm0,ymm1));
             }
 
             // If no error pcRes should be 0
@@ -1023,12 +1024,13 @@ static inline uint32_t nrLDPC_cnProcPc_BG1(t_nrLDPC_lut* p_lut, int8_t* cnProcBu
 
             // Add BN and input LLR, extract the sign bit
             // and add in GF(2) (xor)
-            pcRes ^= _mm256_movemask_epi8(_mm256_adds_epi8(ymm0,ymm1));
+            pcRes ^= simde_mm256_movemask_epi8(simde_mm256_adds_epi8(ymm0,ymm1));
         }
 
         // If no error pcRes should be 0
         // Only use valid CNs
-        pcResSum |= (pcRes&(0xFFFFFFFF>>(32-Mrem)));
+        if (Mrem)
+          pcResSum |= (pcRes&(0xFFFFFFFF>>(32-Mrem)));
 
         // If PC failed we can stop here
         if (pcResSum > 0)
@@ -1071,7 +1073,7 @@ static inline uint32_t nrLDPC_cnProcPc_BG1(t_nrLDPC_lut* p_lut, int8_t* cnProcBu
 
                 // Add BN and input LLR, extract the sign bit
                 // and add in GF(2) (xor)
-                pcRes ^= _mm256_movemask_epi8(_mm256_adds_epi8(ymm0,ymm1));
+                pcRes ^= simde_mm256_movemask_epi8(simde_mm256_adds_epi8(ymm0,ymm1));
             }
 
             // If no error pcRes should be 0
@@ -1091,12 +1093,13 @@ static inline uint32_t nrLDPC_cnProcPc_BG1(t_nrLDPC_lut* p_lut, int8_t* cnProcBu
 
             // Add BN and input LLR, extract the sign bit
             // and add in GF(2) (xor)
-            pcRes ^= _mm256_movemask_epi8(_mm256_adds_epi8(ymm0,ymm1));
+            pcRes ^= simde_mm256_movemask_epi8(simde_mm256_adds_epi8(ymm0,ymm1));
         }
 
         // If no error pcRes should be 0
         // Only use valid CNs
-        pcResSum |= (pcRes&(0xFFFFFFFF>>(32-Mrem)));
+        if (Mrem)
+          pcResSum |= (pcRes&(0xFFFFFFFF>>(32-Mrem)));
 
         // If PC failed we can stop here
         if (pcResSum > 0)
@@ -1139,7 +1142,7 @@ static inline uint32_t nrLDPC_cnProcPc_BG1(t_nrLDPC_lut* p_lut, int8_t* cnProcBu
 
                 // Add BN and input LLR, extract the sign bit
                 // and add in GF(2) (xor)
-                pcRes ^= _mm256_movemask_epi8(_mm256_adds_epi8(ymm0,ymm1));
+                pcRes ^= simde_mm256_movemask_epi8(simde_mm256_adds_epi8(ymm0,ymm1));
             }
 
             // If no error pcRes should be 0
@@ -1158,12 +1161,13 @@ static inline uint32_t nrLDPC_cnProcPc_BG1(t_nrLDPC_lut* p_lut, int8_t* cnProcBu
 
             // Add BN and input LLR, extract the sign bit
             // and add in GF(2) (xor)
-            pcRes ^= _mm256_movemask_epi8(_mm256_adds_epi8(ymm0,ymm1));
+            pcRes ^= simde_mm256_movemask_epi8(simde_mm256_adds_epi8(ymm0,ymm1));
         }
 
         // If no error pcRes should be 0
         // Only use valid CNs
-        pcResSum |= (pcRes&(0xFFFFFFFF>>(32-Mrem)));
+        if (Mrem)
+          pcResSum |= (pcRes&(0xFFFFFFFF>>(32-Mrem)));
 
         // If PC failed we can stop here
         if (pcResSum > 0)
@@ -1206,7 +1210,7 @@ static inline uint32_t nrLDPC_cnProcPc_BG1(t_nrLDPC_lut* p_lut, int8_t* cnProcBu
 
                 // Add BN and input LLR, extract the sign bit
                 // and add in GF(2) (xor)
-                pcRes ^= _mm256_movemask_epi8(_mm256_adds_epi8(ymm0,ymm1));
+                pcRes ^= simde_mm256_movemask_epi8(simde_mm256_adds_epi8(ymm0,ymm1));
             }
 
             // If no error pcRes should be 0
@@ -1225,12 +1229,13 @@ static inline uint32_t nrLDPC_cnProcPc_BG1(t_nrLDPC_lut* p_lut, int8_t* cnProcBu
 
             // Add BN and input LLR, extract the sign bit
             // and add in GF(2) (xor)
-            pcRes ^= _mm256_movemask_epi8(_mm256_adds_epi8(ymm0,ymm1));
+            pcRes ^= simde_mm256_movemask_epi8(simde_mm256_adds_epi8(ymm0,ymm1));
         }
 
         // If no error pcRes should be 0
         // Only use valid CNs
-        pcResSum |= (pcRes&(0xFFFFFFFF>>(32-Mrem)));
+        if (Mrem)
+          pcResSum |= (pcRes&(0xFFFFFFFF>>(32-Mrem)));
 
         // If PC failed we can stop here
         if (pcResSum > 0)
@@ -1273,7 +1278,7 @@ static inline uint32_t nrLDPC_cnProcPc_BG1(t_nrLDPC_lut* p_lut, int8_t* cnProcBu
 
                 // Add BN and input LLR, extract the sign bit
                 // and add in GF(2) (xor)
-                pcRes ^= _mm256_movemask_epi8(_mm256_adds_epi8(ymm0,ymm1));
+                pcRes ^= simde_mm256_movemask_epi8(simde_mm256_adds_epi8(ymm0,ymm1));
             }
 
             // If no error pcRes should be 0
@@ -1292,12 +1297,13 @@ static inline uint32_t nrLDPC_cnProcPc_BG1(t_nrLDPC_lut* p_lut, int8_t* cnProcBu
 
             // Add BN and input LLR, extract the sign bit
             // and add in GF(2) (xor)
-            pcRes ^= _mm256_movemask_epi8(_mm256_adds_epi8(ymm0,ymm1));
+            pcRes ^= simde_mm256_movemask_epi8(simde_mm256_adds_epi8(ymm0,ymm1));
         }
 
         // If no error pcRes should be 0
         // Only use valid CNs
-        pcResSum |= (pcRes&(0xFFFFFFFF>>(32-Mrem)));
+        if (Mrem)
+          pcResSum |= (pcRes&(0xFFFFFFFF>>(32-Mrem)));
 
         // If PC failed we can stop here
         if (pcResSum > 0)
@@ -1340,7 +1346,7 @@ static inline uint32_t nrLDPC_cnProcPc_BG1(t_nrLDPC_lut* p_lut, int8_t* cnProcBu
 
                 // Add BN and input LLR, extract the sign bit
                 // and add in GF(2) (xor)
-                pcRes ^= _mm256_movemask_epi8(_mm256_adds_epi8(ymm0,ymm1));
+                pcRes ^= simde_mm256_movemask_epi8(simde_mm256_adds_epi8(ymm0,ymm1));
             }
 
             // If no error pcRes should be 0
@@ -1359,12 +1365,13 @@ static inline uint32_t nrLDPC_cnProcPc_BG1(t_nrLDPC_lut* p_lut, int8_t* cnProcBu
 
             // Add BN and input LLR, extract the sign bit
             // and add in GF(2) (xor)
-            pcRes ^= _mm256_movemask_epi8(_mm256_adds_epi8(ymm0,ymm1));
+            pcRes ^= simde_mm256_movemask_epi8(simde_mm256_adds_epi8(ymm0,ymm1));
         }
 
         // If no error pcRes should be 0
         // Only use valid CNs
-        pcResSum |= (pcRes&(0xFFFFFFFF>>(32-Mrem)));
+        if (Mrem)
+          pcResSum |= (pcRes&(0xFFFFFFFF>>(32-Mrem)));
 
         // If PC failed we can stop here
         if (pcResSum > 0)
@@ -1407,7 +1414,7 @@ static inline uint32_t nrLDPC_cnProcPc_BG1(t_nrLDPC_lut* p_lut, int8_t* cnProcBu
 
                 // Add BN and input LLR, extract the sign bit
                 // and add in GF(2) (xor)
-                pcRes ^= _mm256_movemask_epi8(_mm256_adds_epi8(ymm0,ymm1));
+                pcRes ^= simde_mm256_movemask_epi8(simde_mm256_adds_epi8(ymm0,ymm1));
             }
 
             // If no error pcRes should be 0
@@ -1426,12 +1433,13 @@ static inline uint32_t nrLDPC_cnProcPc_BG1(t_nrLDPC_lut* p_lut, int8_t* cnProcBu
 
             // Add BN and input LLR, extract the sign bit
             // and add in GF(2) (xor)
-            pcRes ^= _mm256_movemask_epi8(_mm256_adds_epi8(ymm0,ymm1));
+            pcRes ^= simde_mm256_movemask_epi8(simde_mm256_adds_epi8(ymm0,ymm1));
         }
 
         // If no error pcRes should be 0
         // Only use valid CNs
-        pcResSum |= (pcRes&(0xFFFFFFFF>>(32-Mrem)));
+        if (Mrem)
+          pcResSum |= (pcRes&(0xFFFFFFFF>>(32-Mrem)));
 
         // If PC failed we can stop here
         if (pcResSum > 0)
@@ -1474,7 +1482,7 @@ static inline uint32_t nrLDPC_cnProcPc_BG1(t_nrLDPC_lut* p_lut, int8_t* cnProcBu
 
                 // Add BN and input LLR, extract the sign bit
                 // and add in GF(2) (xor)
-                pcRes ^= _mm256_movemask_epi8(_mm256_adds_epi8(ymm0,ymm1));
+                pcRes ^= simde_mm256_movemask_epi8(simde_mm256_adds_epi8(ymm0,ymm1));
             }
 
             // If no error pcRes should be 0
@@ -1493,12 +1501,13 @@ static inline uint32_t nrLDPC_cnProcPc_BG1(t_nrLDPC_lut* p_lut, int8_t* cnProcBu
 
             // Add BN and input LLR, extract the sign bit
             // and add in GF(2) (xor)
-            pcRes ^= _mm256_movemask_epi8(_mm256_adds_epi8(ymm0,ymm1));
+            pcRes ^= simde_mm256_movemask_epi8(simde_mm256_adds_epi8(ymm0,ymm1));
         }
 
         // If no error pcRes should be 0
         // Only use valid CNs
-        pcResSum |= (pcRes&(0xFFFFFFFF>>(32-Mrem)));
+        if (Mrem)
+          pcResSum |= (pcRes&(0xFFFFFFFF>>(32-Mrem)));
 
         // If PC failed we can stop here
         if (pcResSum > 0)
@@ -1569,7 +1578,7 @@ static inline uint32_t nrLDPC_cnProcPc_BG2(t_nrLDPC_lut* p_lut, int8_t* cnProcBu
 
                 // Add BN and input LLR, extract the sign bit
                 // and add in GF(2) (xor)
-                pcRes ^= _mm256_movemask_epi8(_mm256_adds_epi8(ymm0,ymm1));
+                pcRes ^= simde_mm256_movemask_epi8(simde_mm256_adds_epi8(ymm0,ymm1));
             }
 
             // If no error pcRes should be 0
@@ -1588,12 +1597,13 @@ static inline uint32_t nrLDPC_cnProcPc_BG2(t_nrLDPC_lut* p_lut, int8_t* cnProcBu
 
             // Add BN and input LLR, extract the sign bit
             // and add in GF(2) (xor)
-            pcRes ^= _mm256_movemask_epi8(_mm256_adds_epi8(ymm0,ymm1));
+            pcRes ^= simde_mm256_movemask_epi8(simde_mm256_adds_epi8(ymm0,ymm1));
         }
 
         // If no error pcRes should be 0
         // Only use valid CNs
-        pcResSum |= (pcRes&(0xFFFFFFFF>>(32-Mrem)));
+        if (Mrem)
+          pcResSum |= (pcRes&(0xFFFFFFFF>>(32-Mrem)));
 
         // If PC failed we can stop here
         if (pcResSum > 0)
@@ -1636,7 +1646,7 @@ static inline uint32_t nrLDPC_cnProcPc_BG2(t_nrLDPC_lut* p_lut, int8_t* cnProcBu
 
                 // Add BN and input LLR, extract the sign bit
                 // and add in GF(2) (xor)
-                pcRes ^= _mm256_movemask_epi8(_mm256_adds_epi8(ymm0,ymm1));
+                pcRes ^= simde_mm256_movemask_epi8(simde_mm256_adds_epi8(ymm0,ymm1));
             }
 
             // If no error pcRes should be 0
@@ -1655,12 +1665,13 @@ static inline uint32_t nrLDPC_cnProcPc_BG2(t_nrLDPC_lut* p_lut, int8_t* cnProcBu
 
             // Add BN and input LLR, extract the sign bit
             // and add in GF(2) (xor)
-            pcRes ^= _mm256_movemask_epi8(_mm256_adds_epi8(ymm0,ymm1));
+            pcRes ^= simde_mm256_movemask_epi8(simde_mm256_adds_epi8(ymm0,ymm1));
         }
 
         // If no error pcRes should be 0
         // Only use valid CNs
-        pcResSum |= (pcRes&(0xFFFFFFFF>>(32-Mrem)));
+        if (Mrem)
+          pcResSum |= (pcRes&(0xFFFFFFFF>>(32-Mrem)));
 
         // If PC failed we can stop here
         if (pcResSum > 0)
@@ -1703,7 +1714,7 @@ static inline uint32_t nrLDPC_cnProcPc_BG2(t_nrLDPC_lut* p_lut, int8_t* cnProcBu
 
                 // Add BN and input LLR, extract the sign bit
                 // and add in GF(2) (xor)
-                pcRes ^= _mm256_movemask_epi8(_mm256_adds_epi8(ymm0,ymm1));
+                pcRes ^= simde_mm256_movemask_epi8(simde_mm256_adds_epi8(ymm0,ymm1));
             }
 
             // If no error pcRes should be 0
@@ -1722,12 +1733,13 @@ static inline uint32_t nrLDPC_cnProcPc_BG2(t_nrLDPC_lut* p_lut, int8_t* cnProcBu
 
             // Add BN and input LLR, extract the sign bit
             // and add in GF(2) (xor)
-            pcRes ^= _mm256_movemask_epi8(_mm256_adds_epi8(ymm0,ymm1));
+            pcRes ^= simde_mm256_movemask_epi8(simde_mm256_adds_epi8(ymm0,ymm1));
         }
 
         // If no error pcRes should be 0
         // Only use valid CNs
-        pcResSum |= (pcRes&(0xFFFFFFFF>>(32-Mrem)));
+        if (Mrem)
+          pcResSum |= (pcRes&(0xFFFFFFFF>>(32-Mrem)));
 
         // If PC failed we can stop here
         if (pcResSum > 0)
@@ -1770,7 +1782,7 @@ static inline uint32_t nrLDPC_cnProcPc_BG2(t_nrLDPC_lut* p_lut, int8_t* cnProcBu
 
                 // Add BN and input LLR, extract the sign bit
                 // and add in GF(2) (xor)
-                pcRes ^= _mm256_movemask_epi8(_mm256_adds_epi8(ymm0,ymm1));
+                pcRes ^= simde_mm256_movemask_epi8(simde_mm256_adds_epi8(ymm0,ymm1));
             }
 
             // If no error pcRes should be 0
@@ -1789,12 +1801,13 @@ static inline uint32_t nrLDPC_cnProcPc_BG2(t_nrLDPC_lut* p_lut, int8_t* cnProcBu
 
             // Add BN and input LLR, extract the sign bit
             // and add in GF(2) (xor)
-            pcRes ^= _mm256_movemask_epi8(_mm256_adds_epi8(ymm0,ymm1));
+            pcRes ^= simde_mm256_movemask_epi8(simde_mm256_adds_epi8(ymm0,ymm1));
         }
 
         // If no error pcRes should be 0
         // Only use valid CNs
-        pcResSum |= (pcRes&(0xFFFFFFFF>>(32-Mrem)));
+        if (Mrem)
+          pcResSum |= (pcRes&(0xFFFFFFFF>>(32-Mrem)));
 
         // If PC failed we can stop here
         if (pcResSum > 0)
@@ -1837,7 +1850,7 @@ static inline uint32_t nrLDPC_cnProcPc_BG2(t_nrLDPC_lut* p_lut, int8_t* cnProcBu
 
                 // Add BN and input LLR, extract the sign bit
                 // and add in GF(2) (xor)
-                pcRes ^= _mm256_movemask_epi8(_mm256_adds_epi8(ymm0,ymm1));
+                pcRes ^= simde_mm256_movemask_epi8(simde_mm256_adds_epi8(ymm0,ymm1));
             }
 
             // If no error pcRes should be 0
@@ -1856,12 +1869,13 @@ static inline uint32_t nrLDPC_cnProcPc_BG2(t_nrLDPC_lut* p_lut, int8_t* cnProcBu
 
             // Add BN and input LLR, extract the sign bit
             // and add in GF(2) (xor)
-            pcRes ^= _mm256_movemask_epi8(_mm256_adds_epi8(ymm0,ymm1));
+            pcRes ^= simde_mm256_movemask_epi8(simde_mm256_adds_epi8(ymm0,ymm1));
         }
 
         // If no error pcRes should be 0
         // Only use valid CNs
-        pcResSum |= (pcRes&(0xFFFFFFFF>>(32-Mrem)));
+        if (Mrem)
+          pcResSum |= (pcRes&(0xFFFFFFFF>>(32-Mrem)));
 
         // If PC failed we can stop here
         if (pcResSum > 0)
@@ -1904,7 +1918,7 @@ static inline uint32_t nrLDPC_cnProcPc_BG2(t_nrLDPC_lut* p_lut, int8_t* cnProcBu
 
                 // Add BN and input LLR, extract the sign bit
                 // and add in GF(2) (xor)
-                pcRes ^= _mm256_movemask_epi8(_mm256_adds_epi8(ymm0,ymm1));
+                pcRes ^= simde_mm256_movemask_epi8(simde_mm256_adds_epi8(ymm0,ymm1));
             }
 
             // If no error pcRes should be 0
@@ -1923,12 +1937,13 @@ static inline uint32_t nrLDPC_cnProcPc_BG2(t_nrLDPC_lut* p_lut, int8_t* cnProcBu
 
             // Add BN and input LLR, extract the sign bit
             // and add in GF(2) (xor)
-            pcRes ^= _mm256_movemask_epi8(_mm256_adds_epi8(ymm0,ymm1));
+            pcRes ^= simde_mm256_movemask_epi8(simde_mm256_adds_epi8(ymm0,ymm1));
         }
 
         // If no error pcRes should be 0
         // Only use valid CNs
-        pcResSum |= (pcRes&(0xFFFFFFFF>>(32-Mrem)));
+        if (Mrem)
+          pcResSum |= (pcRes&(0xFFFFFFFF>>(32-Mrem)));
 
         // If PC failed we can stop here
         if (pcResSum > 0)

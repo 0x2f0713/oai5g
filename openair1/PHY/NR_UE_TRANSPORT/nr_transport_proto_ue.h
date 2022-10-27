@@ -680,39 +680,7 @@ void dlsch_detection_mrc_TM34(NR_DL_FRAME_PARMS *frame_parms,
                               unsigned short nb_rb,
                               unsigned char dual_stream_UE);
 
-/** \fn dlsch_extract_rbs_single(int32_t **rxdataF,
-    int32_t **dl_ch_estimates,
-    int32_t **rxdataF_ext,
-    int32_t **dl_ch_estimates_ext,
-    uint32_t *rb_alloc,
-    uint8_t symbol,
-    NR_DL_FRAME_PARMS *frame_parms)
-    \brief This function extracts the received resource blocks, both channel estimates and data symbols,
-    for the current allocation and for single antenna eNB transmission.
-    @param rxdataF Raw FFT output of received signal
-    @param dl_ch_estimates Channel estimates of current slot
-    @param rxdataF_ext FFT output for RBs in this allocation
-    @param dl_ch_estimates_ext Channel estimates for RBs in this allocation
-    @param rb_alloc RB allocation vector
-    @param symbol Symbol to extract
-    @param n_dmrs_cdm_groups
-    @param frame_parms Pointer to frame descriptor
-*/
-unsigned short nr_dlsch_extract_rbs_single(int **rxdataF,
-                                        int **dl_ch_estimates,
-                                        int **rxdataF_ext,
-                                        int **dl_ch_estimates_ext,
-                                        unsigned char symbol,
-                                        uint8_t pilots,
-                                        uint8_t config_type,
-                                        unsigned short start_rb,
-                                        unsigned short nb_rb_pdsch,
-                                        uint8_t n_dmrs_cdm_groups,
-                                        NR_DL_FRAME_PARMS *frame_parms,
-                                        uint16_t dlDmrsSymbPos,
-                                        int chest_time_type);
-
-/** \fn dlsch_extract_rbs_multiple(int32_t **rxdataF,
+/** \fn dlsch_extract_rbs(int32_t **rxdataF,
     int32_t **dl_ch_estimates,
     int32_t **rxdataF_ext,
     int32_t **dl_ch_estimates_ext,
@@ -737,19 +705,19 @@ unsigned short nr_dlsch_extract_rbs_single(int **rxdataF,
     @param frame_parms Pointer to frame descriptor
 */
 void nr_dlsch_extract_rbs(int **rxdataF,
-                                        int **dl_ch_estimates,
-                                        int **rxdataF_ext,
-                                        int **dl_ch_estimates_ext,
-                                        unsigned char symbol,
-                                        uint8_t pilots,
-                                        uint8_t config_type,
-                                        unsigned short start_rb,
-                                        unsigned short nb_rb_pdsch,
-                                        uint8_t n_dmrs_cdm_groups,
-                                        uint8_t Nl,
-                                        NR_DL_FRAME_PARMS *frame_parms,
-                                        uint16_t dlDmrsSymbPos,
-                                        int chest_time_type);
+                          int **dl_ch_estimates,
+                          int **rxdataF_ext,
+                          int **dl_ch_estimates_ext,
+                          unsigned char symbol,
+                          uint8_t pilots,
+                          uint8_t config_type,
+                          unsigned short start_rb,
+                          unsigned short nb_rb_pdsch,
+                          uint8_t n_dmrs_cdm_groups,
+                          uint8_t Nl,
+                          NR_DL_FRAME_PARMS *frame_parms,
+                          uint16_t dlDmrsSymbPos,
+                          int chest_time_type);
 
 /** \fn dlsch_extract_rbs_TM7(int32_t **rxdataF,
     int32_t **dl_bf_ch_estimates,
@@ -855,10 +823,6 @@ void construct_HhH_elements(int *ch0conj_ch0,
                          int32_t *after_mf_11,
                          unsigned short nb_rb);
 
-void squared_matrix_element(int32_t *Hh_h_00,
-                            int32_t *Hh_h_00_sq,
-                            unsigned short nb_rb);
-
 void dlsch_channel_level_TM34_meas(int *ch00,
                                    int *ch01,
                                    int *ch10,
@@ -885,19 +849,15 @@ void nr_dlsch_detection_mrc(int **rxdataF_comp,
                             unsigned short nb_rb,
                             int length);
 
-void det_HhH(int32_t *after_mf_00,
-             int32_t *after_mf_01,
-             int32_t *after_mf_10,
-             int32_t *after_mf_11,
-             int32_t *det_fin_128,
-             unsigned short nb_rb);
+void nr_conjch0_mult_ch1(int *ch0,
+                         int *ch1,
+                         int32_t *ch0conj_ch1,
+                         unsigned short nb_rb,
+                         unsigned char output_shift0);
 
-void numer(int32_t *Hh_h_00_sq,
-           int32_t *Hh_h_01_sq,
-           int32_t *Hh_h_10_sq,
-           int32_t *Hh_h_11_sq,
-           int32_t *num_fin,
-           unsigned short nb_rb);
+void nr_a_sum_b(__m128i *input_x,
+                __m128i *input_y,
+                unsigned short nb_rb);
 
 uint8_t rank_estimation_tm3_tm4(int *dl_ch_estimates_00,
                                 int *dl_ch_estimates_01,
@@ -1049,7 +1009,6 @@ void nr_ue_ulsch_procedures(PHY_VARS_NR_UE *UE,
                                unsigned char harq_pid,
                                uint32_t frame,
                                uint8_t slot,
-                               uint8_t thread_id,
                                int gNB_id);
 
 

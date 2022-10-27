@@ -51,7 +51,6 @@
 
 extern RAN_CONTEXT_t RC;
 //extern int l2_init_gNB(void);
-extern void mac_top_init_gNB(void);
 extern uint8_t nfapi_mode;
 
 void process_rlcBearerConfig(struct NR_CellGroupConfig__rlc_BearerToAddModList *rlc_bearer2add_list,
@@ -335,22 +334,13 @@ void config_common(int Mod_idP, int pdsch_AntennaPorts, int pusch_AntennaPorts, 
   cfg->num_tlv++;
 
   // SSB Table Configuration
-  int scs_scaling = 1<<(cfg->ssb_config.scs_common.value);
-  if (scc->downlinkConfigCommon->frequencyInfoDL->absoluteFrequencyPointA < 600000)
-    scs_scaling = scs_scaling*3;
-  if (scc->downlinkConfigCommon->frequencyInfoDL->absoluteFrequencyPointA > 2016666)
-    scs_scaling = scs_scaling>>2;
   uint32_t absolute_diff = (*scc->downlinkConfigCommon->frequencyInfoDL->absoluteFrequencySSB - scc->downlinkConfigCommon->frequencyInfoDL->absoluteFrequencyPointA);
-
-  RC.nrmac[Mod_idP]->ssb_SubcarrierOffset = absolute_diff%(12*scs_scaling);
-  int sco = 31; // no SIB1
-  if(get_softmodem_params()->sa) {
-    sco = RC.nrmac[Mod_idP]->ssb_SubcarrierOffset;
-    if(frequency_range == FR1)
-      sco <<= cfg->ssb_config.scs_common.value; // 38.211 section 7.4.3.1 in FR1 it is expresses in terms of 15kHz SCS
-  }
-
-  cfg->ssb_table.ssb_offset_point_a.value = absolute_diff/(12*scs_scaling) - 10; //absoluteFrequencySSB is the central frequency of SSB which is made by 20RBs in total
+  const int scaling_5khz = scc->downlinkConfigCommon->frequencyInfoDL->absoluteFrequencyPointA < 600000 ? 3 : 1;
+  int sco = (absolute_diff/scaling_5khz) % 24;
+  if(frequency_range == FR2)
+    sco >>= 1; // this assumes 120kHz SCS for SSB and subCarrierSpacingCommon (only option supported by OAI for
+  const int scs_scaling = frequency_range == FR2 ? 1 << (*scc->ssbSubcarrierSpacing - 2) : 1 << *scc->ssbSubcarrierSpacing;
+  cfg->ssb_table.ssb_offset_point_a.value = absolute_diff/(12*scaling_5khz) - 10*scs_scaling; //absoluteFrequencySSB is the central frequency of SSB which is made by 20RBs in total
   cfg->ssb_table.ssb_offset_point_a.tl.tag = NFAPI_NR_CONFIG_SSB_OFFSET_POINT_A_TAG;
   cfg->num_tlv++;
   cfg->ssb_table.ssb_period.value = *scc->ssb_periodicityServingCell;
@@ -360,13 +350,16 @@ void config_common(int Mod_idP, int pdsch_AntennaPorts, int pusch_AntennaPorts, 
   cfg->ssb_table.ssb_subcarrier_offset.tl.tag = NFAPI_NR_CONFIG_SSB_SUBCARRIER_OFFSET_TAG;
   cfg->num_tlv++;
 
+  RC.nrmac[Mod_idP]->ssb_SubcarrierOffset = cfg->ssb_table.ssb_subcarrier_offset.value;
+  RC.nrmac[Mod_idP]->ssb_OffsetPointA = cfg->ssb_table.ssb_offset_point_a.value;
+
   switch (scc->ssb_PositionsInBurst->present) {
     case 1 :
       cfg->ssb_table.ssb_mask_list[0].ssb_mask.value = scc->ssb_PositionsInBurst->choice.shortBitmap.buf[0]<<24;
       cfg->ssb_table.ssb_mask_list[1].ssb_mask.value = 0;
       break;
     case 2 :
-      cfg->ssb_table.ssb_mask_list[0].ssb_mask.value = scc->ssb_PositionsInBurst->choice.mediumBitmap.buf[0]<<24;
+      cfg->ssb_table.ssb_mask_list[0].ssb_mask.value = ((uint32_t) scc->ssb_PositionsInBurst->choice.mediumBitmap.buf[0]) << 24;
       cfg->ssb_table.ssb_mask_list[1].ssb_mask.value = 0;
       break;
     case 3 :
@@ -496,23 +489,21 @@ int rrc_mac_config_req_gNB(module_id_t Mod_idP,
 		  scc);
     LOG_D(NR_MAC, "%s() %s:%d RC.nrmac[Mod_idP]->if_inst->NR_PHY_config_req:%p\n", __FUNCTION__, __FILE__, __LINE__, RC.nrmac[Mod_idP]->if_inst->NR_PHY_config_req);
   
-    // if in nFAPI mode 
-    if ( (NFAPI_MODE == NFAPI_MODE_PNF || NFAPI_MODE == NFAPI_MODE_VNF) && (RC.nrmac[Mod_idP]->if_inst->NR_PHY_config_req == NULL) ){
-      while(RC.nrmac[Mod_idP]->if_inst->NR_PHY_config_req == NULL) {
-        // DJP AssertFatal(RC.nrmac[Mod_idP]->if_inst->PHY_config_req != NULL,"if_inst->phy_config_request is null\n");
-        usleep(100 * 1000);
-        printf("Waiting for PHY_config_req\n");
-      }
+    if (NFAPI_MODE == NFAPI_MODE_PNF || NFAPI_MODE == NFAPI_MODE_VNF) {
+      // fake that the gNB is configured in nFAPI mode, which would normally be
+      // done in a NR_PHY_config_req, but in this mode, there is no PHY
+      RC.gNB[Mod_idP]->configured = 1;
+    } else {
+      NR_PHY_Config_t phycfg = {
+        .Mod_id = Mod_idP,
+        .CC_id  = 0,
+        .cfg    = &RC.nrmac[Mod_idP]->config[0]
+      };
+      DevAssert(RC.nrmac[Mod_idP]->if_inst->NR_PHY_config_req);
+      RC.nrmac[Mod_idP]->if_inst->NR_PHY_config_req(&phycfg);
     }
+
     RC.nrmac[Mod_idP]->minRXTXTIMEpdsch = minRXTXTIMEpdsch;
-
-    NR_PHY_Config_t phycfg;
-    phycfg.Mod_id = Mod_idP;
-    phycfg.CC_id  = 0;
-    phycfg.cfg    = &RC.nrmac[Mod_idP]->config[0];
-
-    if (RC.nrmac[Mod_idP]->if_inst->NR_PHY_config_req) RC.nrmac[Mod_idP]->if_inst->NR_PHY_config_req(&phycfg);
-
     find_SSB_and_RO_available(Mod_idP);
 
     const NR_TDD_UL_DL_Pattern_t *tdd = scc->tdd_UL_DL_ConfigurationCommon ? &scc->tdd_UL_DL_ConfigurationCommon->pattern1 : NULL;
@@ -522,7 +513,7 @@ int rrc_mac_config_req_gNB(module_id_t Mod_idP,
     int nr_ulstart_slot = 0;
     if (tdd) {
       nr_dl_slots = tdd->nrofDownlinkSlots + (tdd->nrofDownlinkSymbols != 0);
-      nr_ulstart_slot = tdd->nrofDownlinkSlots + (tdd->nrofUplinkSymbols == 0);
+      nr_ulstart_slot = tdd->nrofDownlinkSlots;
       nr_slots_period /= get_nb_periods_per_frame(tdd->dl_UL_TransmissionPeriodicity);
     }
     else

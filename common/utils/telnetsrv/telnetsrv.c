@@ -517,12 +517,11 @@ void telnet_pushcmd(telnetshell_cmddef_t *cmd, char *cmdbuff, telnet_printfunc_t
   pushNotifiedFIFO(cmd->qptr, msg);
 }
 
-int process_command(char *buf) {
+int process_command(char *buf, int iteration) {
   int i,j,k;
   char modulename[TELNET_CMD_MAXSIZE];
   char cmd[TELNET_CMD_MAXSIZE];
   char *cmdb=NULL;
-  char *bufbck;
   int rt;
   memset(modulename,0,sizeof(modulename));
   memset(cmd,0,sizeof(cmd));
@@ -552,8 +551,7 @@ int process_command(char *buf) {
     return CMDSTATUS_FOUND;
   }
 
-  
-  bufbck=strdup(buf);
+
   rt=CMDSTATUS_NOTFOUND;
   j = sscanf(buf,"%19s %19s %m[^\t\n]",modulename,cmd,&cmdb);
 
@@ -576,7 +574,7 @@ int process_command(char *buf) {
 			if (telnetparams.CmdParsers[i].cmd[k].cmdflags & TELNETSRV_CMDFLAG_WEBSRVONLY)
 			  continue;
           	if (telnetparams.CmdParsers[i].cmd[k].qptr != NULL) {
-				telnet_pushcmd(&(telnetparams.CmdParsers[i].cmd[k]), cmdb,client_printf );
+				telnet_pushcmd(&(telnetparams.CmdParsers[i].cmd[k]), (cmdb!=NULL)?strdup(cmdb):NULL,client_printf );
           	} else {
               telnetparams.CmdParsers[i].cmd[k].cmdfunc(cmdb, telnetparams.telnetdbg, client_printf);
             }
@@ -598,7 +596,7 @@ int process_command(char *buf) {
         char tbuff[64];
         client_printf(CSI "1J" CSI "1;10H         " STDFMT "%s %i/%i\n",
                       get_time(tbuff,sizeof(tbuff)),lc,telnetparams.loopcount );
-        process_command(bufbck+strlen("loop")+1);
+        process_command(buf+strlen("loop")+1,lc);
         errno=0;
         int rs = read(telnetparams.new_socket,dummybuff,sizeof(dummybuff));
 
@@ -619,7 +617,6 @@ int process_command(char *buf) {
     } /* loop */
   } /* for i */
   free(cmdb);
-  free(bufbck);
   return rt;
 }
 
@@ -710,7 +707,7 @@ void run_telnetsrv(void) {
       }
 
       if (strlen(buf) > 2 ) {
-        status=process_command(buf);
+        status=process_command(buf,0);
       } else
         status=CMDSTATUS_NOCMD;
 
@@ -911,7 +908,6 @@ int telnetsrv_autoinit(void) {
  * will be loaded or not depending on the telnet section of the config file
 */
 int add_telnetcmd(char *modulename, telnetshell_vardef_t *var, telnetshell_cmddef_t *cmd) {
-  int i;
   notifiedFIFO_t *afifo=NULL;
 
   if( modulename == NULL || var == NULL || cmd == NULL) {
@@ -919,7 +915,8 @@ int add_telnetcmd(char *modulename, telnetshell_vardef_t *var, telnetshell_cmdde
     return -1;
   }
 
-  for (i=0; i<TELNET_MAXCMD ; i++) {
+
+  for (int i=0; i<TELNET_MAXCMD ; i++) {
     if (telnetparams.CmdParsers[i].var == NULL) {
       strncpy(telnetparams.CmdParsers[i].module,modulename,sizeof(telnetparams.CmdParsers[i].module)-1);
       telnetparams.CmdParsers[i].cmd = cmd;

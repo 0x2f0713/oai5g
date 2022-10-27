@@ -70,7 +70,7 @@ static double snr_dB=25;
 static double sinr_dB=0;
 static unsigned int max_chan;
 static channel_desc_t **defined_channels;
-static char modellist_name[MAX_OPTNAME_SIZE]= {0};
+static char *modellist_name;
 
 
 void fill_channel_desc(channel_desc_t *chan_desc,
@@ -1922,6 +1922,7 @@ static int channelmod_print_help(char *buff, int debug, telnet_printfunc_t prnt 
   prnt("                  <param name> can be one of \"riceanf\", \"aoa\", \"randaoa\", \"ploss\", \"noise_power_dB\", \"offset\", \"forgetf\"\n");
   return CMDSTATUS_FOUND;
 }
+
 static char *pnames[]={"riceanf","aoa","randaoa","ploss","noise_power_dB","offset","forgetf",NULL};
 static char *pformat[]={"%lf","%lf","%i","%lf","%lf","%i","%lf",NULL};
 int get_channel_params(char *buf, int debug, void *vdata, telnet_printfunc_t prnt) {
@@ -1933,12 +1934,12 @@ int get_channel_params(char *buf, int debug, void *vdata, telnet_printfunc_t prn
       LOG_I(UTIL, "%s received %s\n",__FUNCTION__,buf);
   int chanidx = 0;
   webdatadef_t *tdata =(webdatadef_t *)vdata;
-  if (tdata->lines[0].val[0] != NULL) {
-    chanidx = strtol(tdata->lines[0].val[0],NULL,0);
-  } else {
-	LOG_I(UTIL,"Channel index set to 0, not available in received data\n");
-  }
   if ( strstr(buf, "show") == buf) { 
+    if (tdata->lines[0].val[0] != NULL) {
+      chanidx = strtol(tdata->lines[0].val[0],NULL,0);
+    } else {
+	  LOG_I(UTIL,"Channel index set to 0, not available in received data\n");
+    }	  
     if (tdata != NULL && defined_channels[chanidx] != NULL) {
 		tdata->numcols=2;
 		snprintf(tdata->columns[0].coltitle,sizeof(tdata->columns[0].coltitle),"parameter");
@@ -1963,13 +1964,20 @@ int get_channel_params(char *buf, int debug, void *vdata, telnet_printfunc_t prn
     return tdata->numlines;
   } /* show */ else if ( strstr(buf, "set") == buf) {
 	char cmdbuf[TELNET_MAX_MSGLENGTH];
-	  
-	if (pformat[chanidx][1] == 'i') {			   
-	  sprintf(cmdbuf,"channelmod modify %i %s %i>",chanidx,pnames[chanidx],*(int *)tdata->lines[0].val[0]); 
-	} else {
-	  sprintf(cmdbuf,"channelmod modify %i %s %lf>",chanidx,pnames[chanidx],*(double *)tdata->lines[0].val[0]);
-    }
-    return channelmod_modify_cmd(cmdbuf, debug, prnt);;
+	int sst=sscanf( tdata->tblname,"%*[^=]=%i",&chanidx);
+	if (sst == 1) {
+		
+	  int pidx= tdata->numlines;
+	  if (pformat[pidx][1] == 'i') {			   
+	    sprintf(cmdbuf,"channelmod modify %i %s %s",chanidx,pnames[pidx],tdata->lines[0].val[0]); 
+	  } else {
+	    sprintf(cmdbuf,"channelmod modify %i %s %s",chanidx,pnames[pidx],tdata->lines[0].val[1]);
+      }
+    channelmod_modify_cmd(cmdbuf, debug, prnt);
+    return 200;
+    } else {
+	  prnt("  channel index not found in cannelmod command\n");
+	}
   } else {
 	prnt("%s not implemented\n",buf);	 
   }
@@ -2058,9 +2066,10 @@ static int channelmod_show_cmd(char *buff, int debug, telnet_printfunc_t prnt) {
     } else if ( strcmp(subcmd,"current") == 0) {
       for (int i=0; i < max_chan ; i++) {
         if (defined_channels[i] != NULL) {
-          prnt("model %i %s type %s: \n----------------\n", i, (defined_channels[i]->model_name !=NULL)?defined_channels[i]->model_name:"(no name set)",
+          prnt("model %i %s type %s:\n", i, (defined_channels[i]->model_name !=NULL)?defined_channels[i]->model_name:"(no name set)",
                map_int_to_str(channelmod_names,defined_channels[i]->modelid));
           display_channelmodel(defined_channels[i],debug,prnt);
+          prnt("----------------\n");
         }
       }
     } else {
@@ -2078,7 +2087,7 @@ static int channelmod_show_cmd(char *buff, int debug, telnet_printfunc_t prnt) {
 static int channelmod_modify_cmd(char *buff, int debug, telnet_printfunc_t prnt) {
   char *param=NULL, *value=NULL;
   int cd_id= -1;
-  int s = sscanf(buff,"%i %ms %ms \n",&cd_id,&param, &value);
+  int s = sscanf(buff,"%*s %*s %i %ms %ms \n",&cd_id,&param, &value);
 
   if (cd_id<0 || cd_id >= max_chan) {
     prnt("ERROR, %i: Channel model id outof range (0-%i)\n",cd_id,max_chan-1);

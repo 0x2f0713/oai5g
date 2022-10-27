@@ -130,10 +130,6 @@ NR_UE_ULSCH_t *new_nr_ue_ulsch(uint16_t N_RB_UL, int number_of_harq_pids, NR_DL_
   memset(ulsch, 0, sizeof(*ulsch));
 
   ulsch->number_harq_processes_for_pusch = NR_MAX_ULSCH_HARQ_PROCESSES;
-  ulsch->Mlimit = 4; // maximum harq retransmissions
-
-  //for (i=0; i<10; i++)
-    //ulsch->harq_ids[i] = 0;
 
   for (int i = 0; i < number_of_harq_pids; i++) {
 
@@ -385,7 +381,7 @@ int nr_ulsch_encoding(PHY_VARS_NR_UE *ue,
 
     VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_NR_RATE_MATCHING_LDPC, VCD_FUNCTION_IN);
     start_meas(&ue->ulsch_rate_matching_stats);
-    if (nr_rate_matching_ldpc(0,
+    if (nr_rate_matching_ldpc(harq_process->pusch_pdu.tbslbrm,
                               harq_process->BG,
                               *pz,
                               harq_process->d[r],

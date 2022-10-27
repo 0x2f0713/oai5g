@@ -42,7 +42,7 @@ export enum IArgType {
 
 export enum ICommandOptions {
     update = "update",         // result can be updated, triggers update button on result page when set
-    helponcmd = "helponcmd"    // help tooltip available on command buttons
+    help = "help"    // help tooltip available on command buttons
 }
 
 export interface IVariable {
@@ -87,7 +87,8 @@ export interface IColumn { //should use IVariable ?
 export interface IRow {
     params: IParam[],
     rawIndex: number,
-    cmdName: string
+    cmdName: string,
+    param?:  IVariable   // to transmit the initial command parameter, ex: the channel model index when modify a channel model
 }
 
 

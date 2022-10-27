@@ -3,7 +3,7 @@ import { UntypedFormArray } from '@angular/forms';
 import { BehaviorSubject, forkJoin, timer, of, Observable } from 'rxjs';
 import { filter, map, tap, switchMap} from 'rxjs/operators';
 
-import { CommandsApi, IArgType, IColumn, ICommand, IInfo, ILogLvl, IParam, IRow } from 'src/app/api/commands.api';
+import { CommandsApi, IArgType, IColumn, ICommand, ICommandOptions, IInfo, ILogLvl, IParam, IRow } from 'src/app/api/commands.api';
 import {HelpApi, HelpRequest,HelpResp} from 'src/app/api/help.api';
 import { CmdCtrl } from 'src/app/controls/cmd.control';
 import { InfoCtrl } from 'src/app/controls/info.control';
@@ -26,6 +26,7 @@ const PREDEF_CMD = "show predef"
 })
 export class CommandsComponent {
   hlp_cc:string[]=[];
+  hlp_cmd:string[]=[];
   IArgType = IArgType;
   logLvlValues = Object.values(ILogLvl)
 
@@ -85,7 +86,7 @@ export class CommandsComponent {
       this.commandsApi.setInfo$(info).subscribe();
     }
   }
-
+  
   onModuleSelect(module: ModuleCtrl) {
 
     this.selectedModule = module
@@ -94,11 +95,14 @@ export class CommandsComponent {
     this.cmds$ = this.commandsApi.readCommands$(module.name).pipe(
       map(icmds => icmds.map(icmd => new CmdCtrl(icmd))),
       map(cmds => {
-        module.cmdsFA = new UntypedFormArray(cmds)
+		for (let i=0; i<cmds.length;i++) { 
+		  cmds[i].get_cmd_help(  this.helpApi, module.name)
+		}
+        module.cmdsFA = new UntypedFormArray(cmds) 
         return module.cmdsFA.controls as CmdCtrl[]
       })
     )
-
+    
     this.vars$ = this.commandsApi.readVariables$(module.name).pipe(
       map(ivars => ivars.map(ivar => new VarCtrl(ivar))),
       map(vars => {
@@ -136,8 +140,10 @@ export class CommandsComponent {
   }
 
   private execCmd$(control: CmdCtrl) {
-
-    this.commandsApi.runCommand$(control!.api(), this.selectedModule!.name).subscribe(resp => {
+    let cmd=control!.api();
+    if(this.selectedCmd!.param)
+      this.selectedCmd!.param!.value=cmd.param!.value;
+    this.commandsApi.runCommand$(cmd, this.selectedModule!.name).subscribe(resp => {
       if (resp.display[0]) this.dialogService.updateCmdDialog(control, resp, 'cmd ' + control.nameFC.value + ' response:')
       //          else return of(resp)
 
@@ -208,6 +214,8 @@ export class CommandsComponent {
   }
 
   onParamSubmit(control: RowCtrl) {
+	if (this.selectedCmd!.param)
+	  control.set_cmdparam(this.selectedCmd!.param);
     this.commandsApi.setCmdParams$(control.api(), this.selectedModule!.name).subscribe(() => this.execCmd$(new CmdCtrl(this.selectedCmd!)));
   }
 

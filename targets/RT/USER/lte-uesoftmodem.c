@@ -47,8 +47,8 @@
 #undef MALLOC //there are two conflicting definitions, so we better make sure we don't use it at all
 //#undef FRAME_LENGTH_COMPLEX_SAMPLES //there are two conflicting definitions, so we better make sure we don't use it at all
 
-#include "../../ARCH/COMMON/common_lib.h"
-#include "../../ARCH/ETHERNET/USERSPACE/LIB/if_defs.h"
+#include "radio/COMMON/common_lib.h"
+#include "radio/ETHERNET/USERSPACE/LIB/if_defs.h"
 
 //#undef FRAME_LENGTH_COMPLEX_SAMPLES //there are two conflicting definitions, so we better make sure we don't use it at all
 
@@ -99,7 +99,7 @@ int config_sync_var=-1;
 uint16_t runtime_phy_rx[29][6]; // SISO [MCS 0-28][RBs 0-5 : 6, 15, 25, 50, 75, 100]
 uint16_t runtime_phy_tx[29][6]; // SISO [MCS 0-28][RBs 0-5 : 6, 15, 25, 50, 75, 100]
 
-volatile int             oai_exit = 0;
+int oai_exit = 0;
 
 unsigned int                    mmapped_dma=0;
 
@@ -155,7 +155,6 @@ uint64_t num_missed_slots=0; // counter for the number of missed slots
 // prototypes from function implemented in lte-ue.c, probably should be elsewhere in a include file.
 extern void init_UE_stub_single_thread(int nb_inst,int eMBMS_active, int uecap_xer_in, char *emul_iface);
 extern PHY_VARS_UE *init_ue_vars(LTE_DL_FRAME_PARMS *frame_parms, uint8_t UE_id, uint8_t abstraction_flag);
-extern void get_uethreads_params(void);
 
 int transmission_mode=1;
 
@@ -176,7 +175,6 @@ extern char uecap_xer[1024];
 char uecap_xer_in=0;
 
 int oaisim_flag=0;
-//threads_t threads= {-1,-1,-1,-1,-1,-1,-1,-1};
 
 /* see file openair2/LAYER2/MAC/main.c for why abstraction_flag is needed
  * this is very hackish - find a proper solution
@@ -285,7 +283,6 @@ static void get_options(void) {
   /* unknown parameters on command line will be checked in main
      after all init have been performed                         */
   get_common_options(SOFTMODEM_4GUE_BIT );
-  get_uethreads_params();
   paramdef_t cmdline_uemodeparams[] =CMDLINE_UEMODEPARAMS_DESC;
   paramdef_t cmdline_ueparams[] =CMDLINE_UEPARAMS_DESC;
   config_process_cmdline( cmdline_uemodeparams,sizeof(cmdline_uemodeparams)/sizeof(paramdef_t),NULL);
@@ -703,9 +700,6 @@ int main( int argc, char **argv ) {
               input_fd) != frame_parms[0]->samples_per_tti*10)
       printf("error reading from file\n");
   }
-
-  //p_exmimo_config->framing.tdd_config = TXRXSWITCH_TESTRX;
-
 
   if(IS_SOFTMODEM_DOSCOPE)
     load_softscope("ue",NULL);

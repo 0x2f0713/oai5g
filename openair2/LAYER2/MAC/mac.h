@@ -74,7 +74,7 @@
 #include "PHY/defs_common.h" // for PRACH_RESOURCES_t
 #include "PHY/LTE_TRANSPORT/transport_common.h"
 
-#include "targets/ARCH/COMMON/common_lib.h"
+#include "radio/COMMON/common_lib.h"
 
 /** @defgroup _mac  MAC
  * @ingroup _oai2
@@ -1195,14 +1195,6 @@ typedef struct {
   ///remove RA flag
   bool raFlag;
 } UE_free_ctrl_t;
-/*! \brief REMOVE UE list used by eNB to order UEs/CC for deleting*/
-typedef struct {
-  /// deleting control info
-  UE_free_ctrl_t UE_free_ctrl[NUMBER_OF_UE_MAX+1];
-  int num_UEs;
-  int head_freelist; ///the head position of the delete list
-  int tail_freelist; ///the tail position of the delete list
-} UE_free_list_t;
 
 /**
  * describes contiguous RBs
@@ -1443,7 +1435,7 @@ typedef struct eNB_MAC_INST_s {
   /// processing time of eNB PCH scheduler
   time_stats_t schedule_pch;
 
-  UE_free_list_t UE_free_list;
+  UE_free_ctrl_t UE_free_ctrl[NUMBER_OF_UE_MAX+1];
   /// for scheduling selection
   SCHEDULER_MODES scheduler_mode;
   /// Default scheduler: Pre-processor implementation. Algorithms for UL/DL

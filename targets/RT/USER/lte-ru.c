@@ -54,18 +54,19 @@
 #include "PHY/LTE_ESTIMATION/lte_estimation.h"
 #include "PHY/LTE_REFSIG/lte_refsig.h"
 #include "PHY/LTE_TRANSPORT/if4_tools.h"
-#include "PHY/LTE_TRANSPORT/if5_tools.h"
 #include "PHY/LTE_TRANSPORT/transport_proto.h"
 #include "SCHED/sched_common.h"
 #include "common/utils/LOG/log.h"
 #include "common/utils/LOG/vcd_signal_dumper.h"
-#include "targets/ARCH/COMMON/common_lib.h"
-#include "targets/ARCH/ETHERNET/USERSPACE/LIB/ethernet_lib.h"
+#include "radio/COMMON/common_lib.h"
+#include "radio/ETHERNET/USERSPACE/LIB/ethernet_lib.h"
 
 /* these variables have to be defined before including ENB_APP/enb_paramdef.h */
 static int DEFBANDS[] = {7};
 static int DEFENBS[] = {0};
 static int DEFBFW[] = {0x00007fff};
+static int DEFRUTPCORES[] = {2,4,6,8};
+
 
 #include "ENB_APP/enb_paramdef.h"
 #include "common/config/config_userapi.h"
@@ -78,7 +79,7 @@ static int DEFBFW[] = {0x00007fff};
 
 #define MBMS_EXPERIMENTAL
 
-extern volatile int oai_exit;
+extern int oai_exit;
 extern clock_source_t clock_source;
 #include "executables/thread-common.h"
 //extern PARALLEL_CONF_t get_thread_parallel_conf(void);
@@ -89,7 +90,7 @@ void prach_procedures(PHY_VARS_eNB *eNB,int br_flag);
 
 void stop_RU(RU_t **rup,int nb_ru);
 
-void do_ru_synch(RU_t *ru);
+static void do_ru_synch(RU_t *ru);
 
 void configure_ru(int idx,
                   void *arg);
@@ -134,8 +135,18 @@ static inline void fh_if5_south_out(RU_t *ru,int frame, int subframe, uint64_t t
   if (ru->idx == 0) VCD_SIGNAL_DUMPER_DUMP_VARIABLE_BY_NAME( VCD_SIGNAL_DUMPER_VARIABLES_TRX_TST, ru->proc.timestamp_tx&0xffffffff );
 
   ru->south_out_cnt++;
+  int offset = subframe*ru->frame_parms->samples_per_tti;
+  void *buffs[ru->nb_tx]; 
+  for (int aid=0;aid<ru->nb_tx;aid++) buffs[aid] = (void*)&ru->common.txdata[aid][offset]; 
 
-  send_IF5(ru, timestamp, subframe, &ru->seqno, IF5_RRH_GW_DL);
+  ru->ifdevice.trx_write_func2(&ru->ifdevice,
+  		               timestamp,
+                               buffs,
+			       0,
+			       ru->frame_parms->samples_per_tti,
+			       0,
+			       ru->nb_tx); 
+
 }
 
 
@@ -172,7 +183,7 @@ void fh_if5_south_in(RU_t *ru,
                      int *subframe) {
   LTE_DL_FRAME_PARMS *fp = ru->frame_parms;
   RU_proc_t *proc = &ru->proc;
-  recv_IF5(ru, &proc->timestamp_rx, *subframe, IF5_RRH_GW_UL);
+  ru->ifdevice.trx_read_func2(&ru->ifdevice,&proc->timestamp_rx,NULL,fp->samples_per_tti);
   proc->frame_rx    = (proc->timestamp_rx / (fp->samples_per_tti*10))&1023;
   proc->tti_rx = (proc->timestamp_rx / fp->samples_per_tti)%10;
   
@@ -398,8 +409,8 @@ void fh_if5_north_asynch_in(RU_t *ru,
   LTE_DL_FRAME_PARMS *fp = ru->frame_parms;
   RU_proc_t *proc        = &ru->proc;
   int tti_tx,frame_tx;
-  openair0_timestamp timestamp_tx;
-  recv_IF5(ru, &timestamp_tx, *subframe, IF5_RRH_GW_DL);
+  openair0_timestamp timestamp_tx=0;
+  //recv_IF5(ru, &timestamp_tx, *subframe, IF5_RRH_GW_DL);
   //      LOG_I(PHY,"Received subframe %d (TS %llu) from RCC\n",tti_tx,timestamp_tx);
   tti_tx = (timestamp_tx/fp->samples_per_tti)%10;
   frame_tx    = (timestamp_tx/(fp->samples_per_tti*10))&1023;
@@ -492,11 +503,9 @@ void fh_if4p5_north_asynch_in(RU_t *ru,
 
 
 void fh_if5_north_out(RU_t *ru) {
-  RU_proc_t *proc=&ru->proc;
-  uint8_t seqno=0;
   /// **** send_IF5 of rxdata to BBU **** ///
   VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME( VCD_SIGNAL_DUMPER_FUNCTIONS_SEND_IF5, 1 );
-  send_IF5(ru, proc->timestamp_rx, proc->tti_rx, &seqno, IF5_RRH_GW_UL);
+//  send_IF5(ru, proc->timestamp_rx, proc->tti_rx, &seqno, IF5_RRH_GW_UL);
   VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME( VCD_SIGNAL_DUMPER_FUNCTIONS_SEND_IF5, 0 );
 }
 
@@ -759,12 +768,8 @@ void tx_rf(RU_t *ru,
     }
 
 #if defined(__x86_64) || defined(__i386__)
-#ifdef __AVX2__
     sf_extension = (sf_extension)&0xfffffff8;
-#else
-    sf_extension = (sf_extension)&0xfffffffc;
-#endif
-#elif defined(__arm__)
+#elif defined(__arm__) || defined(__aarch64__)
     sf_extension = (sf_extension)&0xfffffffc;
 #endif
 
@@ -1059,7 +1064,7 @@ int wakeup_synch(RU_t *ru) {
 }
 
 
-void do_ru_synch(RU_t *ru) {
+static void do_ru_synch(RU_t *ru) {
   LTE_DL_FRAME_PARMS *fp  = ru->frame_parms;
   RU_proc_t *proc         = &ru->proc;
   int rxs, ic, ret, i;
@@ -1077,7 +1082,7 @@ void do_ru_synch(RU_t *ru) {
     ru->rfdevice.openair0_cfg->tx_freq[i] = temp_freq1;
   }
 
-  ru->rfdevice.trx_set_freq_func(&ru->rfdevice,ru->rfdevice.openair0_cfg,0);
+  ru->rfdevice.trx_set_freq_func(&ru->rfdevice,ru->rfdevice.openair0_cfg);
 
   while ((ru->in_synch ==0)&&(!oai_exit)) {
     // read in frame
@@ -1924,7 +1929,7 @@ static void *ru_thread( void *param ) {
 
 
 // This thread run the initial synchronization like a UE
-void *ru_thread_synch(void *arg) {
+static void *ru_thread_synch(void *arg) {
   RU_t *ru = (RU_t *)arg;
   __attribute__((unused))
   LTE_DL_FRAME_PARMS *fp = ru->frame_parms;
@@ -2271,15 +2276,6 @@ void init_RU_proc(RU_t *ru) {
   proc->instance_cnt_rf_tx = -1;
   pthread_mutex_init( &proc->mutex_rf_tx, NULL);
   pthread_cond_init( &proc->cond_rf_tx, NULL);
-#endif
-#ifndef DEADLINE_SCHEDULER
-  attr_FH        = &proc->attr_FH;
-  attr_FH1       = &proc->attr_FH1;
-  attr_prach     = &proc->attr_prach;
-  attr_synch     = &proc->attr_synch;
-  attr_asynch    = &proc->attr_asynch_rxtx;
-  attr_emulateRF = &proc->attr_emulateRF;
-  attr_prach_br  = &proc->attr_prach_br;
 #endif
 
   if (ru->has_ctrl_prt == 1) pthread_create( &proc->pthread_ctrl, attr_ctrl, ru_thread_control, (void*)ru );

@@ -165,7 +165,7 @@ void mac_rlc_data_ind     (
 
   switch (channel_idP) {
   case 1 ... 3: rb = ue->srb[channel_idP - 1]; break;
-  case 4 ... 8: rb = ue->drb[channel_idP - 4]; break;
+  case 4 ... 32: rb = ue->drb[channel_idP - 4]; break;
   default:      rb = NULL;                     break;
   }
 
@@ -206,7 +206,7 @@ tbs_size_t mac_rlc_data_req(
 
   switch (channel_idP) {
   case 1 ... 3: rb = ue->srb[channel_idP - 1]; break;
-  case 4 ... 8: rb = ue->drb[channel_idP - 4]; break;
+  case 4 ... 32: rb = ue->drb[channel_idP - 4]; break;
   default:
   rb = NULL;
   LOG_E(RLC, "In %s:%d:%s: data request for unknown RB with LCID 0x%02x !\n", __FILE__, __LINE__, __FUNCTION__, channel_idP);
@@ -254,7 +254,7 @@ mac_rlc_status_resp_t mac_rlc_status_ind(
 
   switch (channel_idP) {
   case 1 ... 3: rb = ue->srb[channel_idP - 1]; break;
-  case 4 ... 8: rb = ue->drb[channel_idP - 4]; break;
+  case 4 ... NGAP_MAX_DRBS_PER_UE: rb = ue->drb[channel_idP - 4]; break;
   default:      rb = NULL;                     break;
   }
 
@@ -317,7 +317,7 @@ rlc_buffer_occupancy_t mac_rlc_get_buffer_occupancy_ind(
 
   switch (channel_idP) {
   case 1 ... 3: rb = ue->srb[channel_idP - 1]; break;
-  case 4 ... 8: rb = ue->drb[channel_idP - 4]; break;
+  case 4 ... NGAP_MAX_DRBS_PER_UE: rb = ue->drb[channel_idP - 4]; break;
   default:      rb = NULL;                     break;
   }
 
@@ -379,7 +379,7 @@ rlc_op_status_t rlc_data_req     (const protocol_ctxt_t *const ctxt_pP,
     if (rb_idP >= 1 && rb_idP <= 2)
       rb = ue->srb[rb_idP - 1];
   } else {
-    if (rb_idP >= 1 && rb_idP <= 5)
+    if (rb_idP >= 1 && rb_idP <= MAX_DRBS_PER_UE)
       rb = ue->drb[rb_idP - 1];
   }
 
@@ -410,7 +410,7 @@ int nr_rlc_get_available_tx_space(
 
   switch (channel_idP) {
   case 1 ... 3: rb = ue->srb[channel_idP - 1]; break;
-  case 4 ... 8: rb = ue->drb[channel_idP - 4]; break;
+  case 4 ... NGAP_MAX_DRBS_PER_UE: rb = ue->drb[channel_idP - 4]; break;
   default:      rb = NULL;                     break;
   }
 
@@ -514,7 +514,7 @@ rb_found:
       T_INT(ue->rnti), T_INT(rb_id), T_INT(size));
 
     const ngran_node_t type = RC.nrrrc[0 /*ctxt_pP->module_id*/]->node_type;
-    AssertFatal(type != ngran_eNB_CU && type != ngran_ng_eNB_CU && type != ngran_gNB_CU,
+    AssertFatal(!NODE_IS_CU(type),
                 "Can't be CU, bad node type %d\n", type);
 
     // if (NODE_IS_DU(type) && is_srb == 0) {
@@ -587,7 +587,7 @@ static void successful_delivery(void *_ue, nr_rlc_entity_t *entity, int sdu_id)
   }
 
   /* maybe DRB? */
-  for (i = 0; i < 5; i++) {
+  for (i = 0; i < MAX_DRBS_PER_UE; i++) {
     if (entity == ue->drb[i]) {
       is_srb = 0;
       rb_id = i+1;
@@ -645,7 +645,7 @@ static void max_retx_reached(void *_ue, nr_rlc_entity_t *entity)
   }
 
   /* maybe DRB? */
-  for (i = 0; i < 5; i++) {
+  for (i = 0; i < MAX_DRBS_PER_UE; i++) {
     if (entity == ue->drb[i]) {
       is_srb = 0;
       rb_id = i+1;
@@ -791,7 +791,7 @@ static void add_drb_am(int rnti, struct NR_DRB_ToAddMod *s, NR_RLC_BearerConfig_
   int t_reassembly;
   int sn_field_length;
 
-  if (!(drb_id >= 1 && drb_id <= 5)) {
+  if (!(drb_id >= 1 && drb_id <= MAX_DRBS_PER_UE)) {
     LOG_E(RLC, "%s:%d:%s: fatal, bad srb id %d\n",
           __FILE__, __LINE__, __FUNCTION__, drb_id);
     exit(1);
@@ -868,7 +868,7 @@ static void add_drb_um(int rnti, struct NR_DRB_ToAddMod *s, NR_RLC_BearerConfig_
   int sn_field_length;
   int t_reassembly;
 
-  if (!(drb_id >= 1 && drb_id <= 5)) {
+  if (!(drb_id >= 1 && drb_id <= MAX_DRBS_PER_UE)) {
     LOG_E(RLC, "%s:%d:%s: fatal, bad srb id %d\n",
           __FILE__, __LINE__, __FUNCTION__, drb_id);
     exit(1);
@@ -1041,7 +1041,7 @@ rlc_op_status_t rrc_rlc_config_req   (
     exit(1);
   }
   if ((srb_flagP && !(rb_idP >= 1 && rb_idP <= 2)) ||
-      (!srb_flagP && !(rb_idP >= 1 && rb_idP <= 5))) {
+      (!srb_flagP && !(rb_idP >= 1 && rb_idP <= MAX_DRBS_PER_UE))) {
     LOG_E(RLC, "%s:%d:%s: bad rb_id (%ld) (is_srb %d)\n", __FILE__, __LINE__, __FUNCTION__, rb_idP, srb_flagP);
     exit(1);
   }
@@ -1066,10 +1066,10 @@ rlc_op_status_t rrc_rlc_config_req   (
     if (ue->srb[i] != NULL)
       break;
   if (i == 2) {
-    for (i = 0; i < 5; i++)
+    for (i = 0; i < MAX_DRBS_PER_UE; i++)
       if (ue->drb[i] != NULL)
         break;
-    if (i == 5)
+    if (i == MAX_DRBS_PER_UE)
       nr_rlc_manager_remove_ue(nr_rlc_ue_manager, ctxt_pP->rnti);
   }
   nr_rlc_manager_unlock(nr_rlc_ue_manager);
@@ -1102,11 +1102,74 @@ void nr_rlc_tick(int frame, int subframe)
 }
 
 /* This is a hack, to compile the gNB.
- * TODO: remove it. The solution is to cleanup cmake_targets/CMakeLists.txt
+ * TODO: remove it. The solution is to cleanup CMakeLists.txt
  */
 void rlc_tick(int a, int b)
 {
   LOG_E(RLC, "%s:%d:%s: this code should not be reached\n",
         __FILE__, __LINE__, __FUNCTION__);
   exit(1);
+}
+
+void nr_rlc_activate_avg_time_to_tx(
+  const rnti_t            rnti,
+  const logical_chan_id_t channel_id,
+  const bool              is_on)
+{
+  nr_rlc_ue_t *ue;
+  nr_rlc_entity_t *rb;
+
+  nr_rlc_manager_lock(nr_rlc_ue_manager);
+  ue = nr_rlc_manager_get_ue(nr_rlc_ue_manager, rnti);
+
+  switch (channel_id) {
+  case 1 ... 3: rb = ue->srb[channel_id - 1]; break;
+  case 4 ... 8: rb = ue->drb[channel_id - 4]; break;
+  default:      rb = NULL;                    break;
+  }
+
+  if (rb != NULL) {
+    rb->avg_time_is_on = is_on;
+    time_average_reset(rb->txsdu_avg_time_to_tx);
+  } else {
+    LOG_E(RLC, "[%s] Radio Bearer (channel ID %d) is NULL for UE with rnti %x\n", __FUNCTION__, channel_id, rnti);
+  }
+
+  nr_rlc_manager_unlock(nr_rlc_ue_manager);
+}
+
+/* returns false in case of error, true if everything ok */
+const bool nr_rlc_get_statistics(
+  int rnti,
+  int srb_flag,
+  int rb_id,
+  nr_rlc_statistics_t *out)
+{
+  nr_rlc_ue_t     *ue;
+  nr_rlc_entity_t *rb;
+  bool             ret;
+
+  nr_rlc_manager_lock(nr_rlc_ue_manager);
+  ue = nr_rlc_manager_get_ue(nr_rlc_ue_manager, rnti);
+
+  rb = NULL;
+
+  if (srb_flag) {
+    if (rb_id >= 1 && rb_id <= 2)
+      rb = ue->srb[rb_id - 1];
+  } else {
+    if (rb_id >= 1 && rb_id <= 5)
+      rb = ue->drb[rb_id - 1];
+  }
+
+  if (rb != NULL) {
+    rb->get_stats(rb, out);
+    ret = true;
+  } else {
+    ret = false;
+  }
+
+  nr_rlc_manager_unlock(nr_rlc_ue_manager);
+
+  return ret;
 }

@@ -141,7 +141,6 @@ void fill_scheduled_response(nr_scheduled_response_t *scheduled_response,
                              int cc_id,
                              frame_t frame,
                              int slot,
-                             int thread_id,
                              void *phy_data);
 
 /*! \fn int8_t nr_ue_get_SR(module_id_t module_idP, frame_t frameP, slot_t slotP);
@@ -194,6 +193,7 @@ int nr_get_sf_retxBSRTimer(uint8_t retxBSR_Timer);
 
 int8_t nr_ue_process_dci(module_id_t module_id, int cc_id, uint8_t gNB_index, frame_t frame, int slot, dci_pdu_rel15_t *dci, fapi_nr_dci_indication_pdu_t *dci_ind);
 int nr_ue_process_dci_indication_pdu(module_id_t module_id, int cc_id, int gNB_index, frame_t frame, int slot, fapi_nr_dci_indication_pdu_t *dci);
+int8_t nr_ue_process_csirs_measurements(module_id_t module_id, frame_t frame, int slot, fapi_nr_csirs_measurements_t *csirs_measurements);
 
 uint32_t get_ssb_frame(uint32_t test);
 
@@ -212,6 +212,18 @@ uint8_t get_ssb_rsrp_payload(NR_UE_MAC_INST_t *mac,
                              struct NR_CSI_ReportConfig *csi_reportconfig,
                              NR_CSI_ResourceConfigId_t csi_ResourceConfigId,
                              NR_CSI_MeasConfig_t *csi_MeasConfig);
+
+uint8_t get_csirs_RI_PMI_CQI_payload(NR_UE_MAC_INST_t *mac,
+                                     PUCCH_sched_t *pucch,
+                                     struct NR_CSI_ReportConfig *csi_reportconfig,
+                                     NR_CSI_ResourceConfigId_t csi_ResourceConfigId,
+                                     NR_CSI_MeasConfig_t *csi_MeasConfig);
+
+uint8_t get_csirs_RSRP_payload(NR_UE_MAC_INST_t *mac,
+                               PUCCH_sched_t *pucch,
+                               struct NR_CSI_ReportConfig *csi_reportconfig,
+                               NR_CSI_ResourceConfigId_t csi_ResourceConfigId,
+                               NR_CSI_MeasConfig_t *csi_MeasConfig);
 
 uint8_t nr_get_csi_payload(NR_UE_MAC_INST_t *mac,
                            PUCCH_sched_t *pucch,
@@ -256,13 +268,6 @@ void get_bwp_info(NR_UE_MAC_INST_t *mac,
                   NR_BWP_UplinkCommon_t **ubwpc);
 
 NR_BWP_DownlinkCommon_t *get_bwp_downlink_common(NR_UE_MAC_INST_t *mac, NR_BWP_Id_t dl_bwp_id);
-
-uint8_t nr_extract_dci_info(NR_UE_MAC_INST_t *mac,
-                            uint8_t dci_format,
-                            uint8_t dci_length,
-                            uint16_t rnti,
-                            uint64_t *dci_pdu,
-                            dci_pdu_rel15_t *nr_pdci_info_extracted);
 
 NR_PUSCH_TimeDomainResourceAllocationList_t *choose_ul_tda_list(const NR_PUSCH_Config_t *pusch_Config,NR_PUSCH_ConfigCommon_t *pusch_ConfigCommon);
 NR_PDSCH_TimeDomainResourceAllocationList_t *choose_dl_tda_list(NR_PDSCH_Config_t *pdsch_Config,NR_PDSCH_ConfigCommon_t *pdsch_ConfigCommon);
@@ -347,11 +352,10 @@ and fills the PRACH PDU per each FD occasion.
 @param module_idP Index of UE instance
 @param frameP Frame index
 @param slotP Slot index
-@param thread_id RX/TX Thread ID
 @returns void
 */
-void nr_ue_prach_scheduler(module_id_t module_idP, frame_t frameP, sub_frame_t slotP, int thread_id);
-void nr_ue_pucch_scheduler(module_id_t module_idP, frame_t frameP, int slotP, int thread_id);
+void nr_ue_prach_scheduler(module_id_t module_idP, frame_t frameP, sub_frame_t slotP);
+void nr_ue_pucch_scheduler(module_id_t module_idP, frame_t frameP, int slotP, void *phy_data);
 void nr_schedule_csirs_reception(NR_UE_MAC_INST_t *mac, int frame, int slot);
 void nr_schedule_csi_for_im(NR_UE_MAC_INST_t *mac, int frame, int slot);
 

@@ -117,8 +117,9 @@ typedef struct {
 extern void websrv_printjson(char * label, json_t *jsonobj,int dbglvl);                                   //debug:  dump a json object
 extern void websrv_jbody( struct _u_response * response, json_t *jbody,int httpstatus,int dbglvl);         // add a json body in a http response
 
-extern void websrv_printf_start(struct _u_response * response, int buffsize );   // start a printf, lock the buffer
+extern void websrv_printf_start(struct _u_response * response, int buffsize, bool async );   // start a printf, lock the buffer
 extern void websrv_printf( const char *message,  ...);                           // add characters in the printf locked buffer
+extern void websrv_async_printf( const char *message,  ...);                     // add characters in the printf locked buffer and terminate the print session
 extern void websrv_printf_end(int httpstatus,int dbglvl );                       // add the printf buffer in the body of a http response, unlock the buffer
 extern void websrv_dump_request(char *label, const struct _u_request *request, int dbglvl);        // debug: dump a http request
 extern int websrv_string_response(char *astring, struct _u_response * response, int httpstatus, int dbglvl) ;  // add a string in a http response

@@ -62,12 +62,11 @@
 #undef MALLOC //there are two conflicting definitions, so we better make sure we don't use it at all
 //#undef FRAME_LENGTH_COMPLEX_SAMPLES //there are two conflicting definitions, so we better make sure we don't use it at all
 
-#include "targets/ARCH/COMMON/common_lib.h"
+#include "radio/COMMON/common_lib.h"
 
 //#undef FRAME_LENGTH_COMPLEX_SAMPLES //there are two conflicting definitions, so we better make sure we don't use it at all
 
 #include "PHY/LTE_TRANSPORT/if4_tools.h"
-#include "PHY/LTE_TRANSPORT/if5_tools.h"
 #include "PHY/LTE_ESTIMATION/lte_estimation.h"
 
 #include "PHY/phy_extern.h"
@@ -106,7 +105,7 @@ struct timing_info_t {
 // Fix per CC openair rf/if device update
 // extern openair0_device openair0;
 
-extern volatile int oai_exit;
+extern int oai_exit;
 
 extern int transmission_mode;
 
@@ -326,7 +325,6 @@ static void *L1_thread_tx(void *param) {
 
   //wait_sync("tx_thread");
 
-  proc->respEncode = eNB->proc.L1_proc.respEncode;
   while (!oai_exit) {
     LOG_D(PHY,"Waiting for TX (IC %d)\n",proc->instance_cnt);
 
@@ -835,14 +833,9 @@ static void *process_stats_thread(void *param) {
         print_meas(&eNB->dlsch_turbo_encoding_preperation_stats,"dlsch_coding_crc",NULL,NULL);
         print_meas(&eNB->dlsch_turbo_encoding_segmentation_stats,"dlsch_segmentation",NULL,NULL);
         print_meas(&eNB->dlsch_encoding_stats,"dlsch_encoding",NULL,NULL);
-        print_meas(&eNB->dlsch_turbo_encoding_signal_stats,"coding_signal",NULL,NULL);
-        print_meas(&eNB->dlsch_turbo_encoding_main_stats,"coding_main",NULL,NULL);
         print_meas(&eNB->dlsch_turbo_encoding_stats,"turbo_encoding",NULL,NULL);
         print_meas(&eNB->dlsch_interleaving_stats,"turbo_interleaving",NULL,NULL);
         print_meas(&eNB->dlsch_rate_matching_stats,"turbo_rate_matching",NULL,NULL);
-        print_meas(&eNB->dlsch_turbo_encoding_waiting_stats,"coding_wait",NULL,NULL);
-        print_meas(&eNB->dlsch_turbo_encoding_wakeup_stats0,"coding_worker_0",NULL,NULL);
-        print_meas(&eNB->dlsch_turbo_encoding_wakeup_stats1,"coding_worker_1",NULL,NULL);
       }
 
       print_meas(&eNB->dlsch_modulation_stats,"dlsch_modulation",NULL,NULL);
@@ -924,14 +917,6 @@ void init_eNB_proc(int inst) {
     pthread_mutex_init( &proc->mutex_RU_PRACH_br,NULL);
     pthread_cond_init( &proc->cond_prach_br, NULL);
     pthread_attr_init( &proc->attr_prach_br);
-#ifndef DEADLINE_SCHEDULER
-    attr0       = &L1_proc->attr;
-    attr1       = &L1_proc_tx->attr;
-    attr_prach  = &proc->attr_prach;
-    attr_prach_br  = &proc->attr_prach_br;
-    //    attr_td     = &proc->attr_td;
-    //    attr_te     = &proc->attr_te;
-#endif
 
     if(get_thread_worker_conf() == WORKER_ENABLE) {
       init_te_thread(eNB);
