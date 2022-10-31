@@ -547,7 +547,7 @@ sin_port:
 sin_addr:
     { s_addr: INADDR_ANY }
   };
-  bind(t->listen_sock, (struct sockaddr *)&addr, sizeof(addr));
+  AssertFatal(bind(t->listen_sock, (struct sockaddr *)&addr, sizeof(addr))==0,"");
   AssertFatal(listen(t->listen_sock, 5) == 0, "");
   struct epoll_event ev= {0};
   ev.events = EPOLLIN;
